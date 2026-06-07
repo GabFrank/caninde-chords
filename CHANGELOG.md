@@ -1,3 +1,10 @@
+# [2.9.0](https://github.com/GabFrank/caninde-chords/compare/v2.8.0...v2.9.0) (2026-06-07)
+
+
+### Features
+
+* **audio:** subir volumen de la guitarra (master + ganancia de samples) con limitador ([401f956](https://github.com/GabFrank/caninde-chords/commit/401f95621c742a4c90b8daa16c06ce40d47033cd))
+
 # [2.8.0](https://github.com/GabFrank/caninde-chords/compare/v2.7.0...v2.8.0) (2026-06-07)
 
 
