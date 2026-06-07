@@ -1,19 +1,32 @@
-name: Deploy to Firebase Hosting
+name: Release & Deploy
 
-# Publica la app automáticamente cada vez que haces push a main.
-# Equivalente al "Deploy" automático que hacía AI Studio.
+# En cada push a main: 1) semantic-release sube la versión según los commits,
+# genera CHANGELOG y crea la release en GitHub, y 2) compila y publica la app
+# en Firebase Hosting. Es el "Deploy" automático, ahora con versionado.
 on:
   push:
     branches:
       - main
-  workflow_dispatch: {} # permite lanzar el deploy manualmente desde la pestaña Actions
+  workflow_dispatch: {} # permite lanzarlo a mano desde la pestaña Actions
+
+permissions:
+  contents: write # crear tags, commit de versión y releases
+  issues: write
+  pull-requests: write
+
+# Evita despliegues simultáneos pisándose entre sí.
+concurrency:
+  group: release-deploy
+  cancel-in-progress: false
 
 jobs:
-  build_and_deploy:
+  release_and_deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # semantic-release necesita todo el historial y los tags
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -23,6 +36,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Semantic Release (versionado automático)
+        run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
         run: npm run build
