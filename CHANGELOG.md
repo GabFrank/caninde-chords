@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/GabFrank/caninde-chords/compare/v2.0.2...v2.1.0) (2026-06-07)
+
+
+### Features
+
+* exponer /version.json para verificar la versión publicada ([949d535](https://github.com/GabFrank/caninde-chords/commit/949d53581804050b0b7217f9b888cedab02371d5))
+
 ## [2.0.2](https://github.com/GabFrank/caninde-chords/compare/v2.0.1...v2.0.2) (2026-06-07)
 
 
