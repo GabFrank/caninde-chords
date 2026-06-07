@@ -16,7 +16,7 @@ export default defineConfig(({mode}) => {
       react(), 
       tailwindcss(),
       VitePWA({
-        registerType: 'prompt',
+        registerType: 'autoUpdate',
         includeAssets: ['CanindeChords.png'],
         manifest: {
           name: 'CanindeChords',

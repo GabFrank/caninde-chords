@@ -1474,7 +1474,7 @@ export default function App() {
                   className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800" 
                   title={t.settings}
                 >
-                  <Settings size={18} />
+                  <Settings size={18} className="text-emerald-500" />
                 </button>
                 <button onClick={handleLogout} className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800" title={t.logout}>
                   <LogOut size={18} />
