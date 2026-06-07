@@ -9,11 +9,14 @@ import { HarmonyManual } from './HarmonyManual';
 
 interface UtilitariosHubProps {
   onExportToSong?: (songTitle: string, songContent: string) => void;
+  lang?: 'es' | 'en';
 }
 
-export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong }) => {
+export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong, lang = 'es' }) => {
   const [activeSubTab, setActiveSubTab] = useState<'tuner' | 'composer' | 'manual'>('composer'); // default composer as requested
   const [composerSeed, setComposerSeed] = useState<{ title: string; chords: string[] } | null>(null);
+
+  const tr = (es: string, en: string) => (lang === 'en' ? en : es);
 
   // REQ-MAN-04: abrir una progresión del Manual en el Compositor
   const handleOpenInComposer = (chords: string[], title: string) => {
@@ -33,7 +36,7 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong }
             className={`px-4 py-2 rounded-xl text-xs font-black font-sans flex items-center gap-2 transition-all ${activeSubTab === 'composer' ? 'bg-white dark:bg-zinc-800 text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'}`}
           >
             <Compass size={14} className={activeSubTab === 'composer' ? 'text-blue-600' : ''} />
-            Yggdrasil Armónico (Taller)
+            {tr('Yggdrasil Armónico (Taller)', 'Harmonic Workshop (Yggdrasil)')}
           </button>
 
           <button
@@ -41,7 +44,7 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong }
             className={`px-4 py-2 rounded-xl text-xs font-black font-sans flex items-center gap-2 transition-all ${activeSubTab === 'tuner' ? 'bg-white dark:bg-zinc-800 text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'}`}
           >
             <Activity size={14} className={activeSubTab === 'tuner' ? 'text-blue-600 animate-pulse' : ''} />
-            Afinador Interactivo
+            {tr('Afinador Interactivo', 'Interactive Tuner')}
           </button>
 
           <button
@@ -49,7 +52,7 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong }
             className={`px-4 py-2 rounded-xl text-xs font-black font-sans flex items-center gap-2 transition-all ${activeSubTab === 'manual' ? 'bg-white dark:bg-zinc-800 text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'}`}
           >
             <BookOpen size={14} className={activeSubTab === 'manual' ? 'text-blue-600' : ''} />
-            Manual de Conexiones
+            {tr('Manual de Conexiones', 'Connections Manual')}
           </button>
 
         </div>
@@ -70,6 +73,7 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong }
                 onExportToSong={onExportToSong}
                 seed={composerSeed}
                 onSeedConsumed={() => setComposerSeed(null)}
+                lang={lang}
               />
             </motion.div>
           )}
@@ -94,7 +98,7 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong }
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.18 }}
             >
-              <HarmonyManual onOpenInComposer={handleOpenInComposer} />
+              <HarmonyManual onOpenInComposer={handleOpenInComposer} lang={lang} />
             </motion.div>
           )}
         </AnimatePresence>

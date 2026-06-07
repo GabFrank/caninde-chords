@@ -36,28 +36,36 @@ export const EMOTIONS: Record<string, EmotionSchema> = {
 interface ToolInfo {
   id: Tool;
   name: string;
+  nameEn: string;
   desc: string;
+  descEn: string;
   emotions: string[];
   astralRange: string;
 }
 
 const TOOLS_INFO: ToolInfo[] = [
-  { id: 'diatonic', name: 'Escalera Diatónica', desc: 'Acordes naturales de la tonalidad actual.', emotions: ['luminoso', 'serenidad'], astralRange: '1' },
-  { id: 'augmentedPortal', name: 'Portal Aumentado', desc: 'La simetría del acorde aumentado abre puertas a mundos de ensueño.', emotions: ['ingravidez', 'asombro'], astralRange: '3-4' },
-  { id: 'diminishedBridge', name: 'Puente Disminuido', desc: 'Tensión cromática pasajera para resolver con fuerza.', emotions: ['tension', 'suspenso'], astralRange: '3' },
-  { id: 'chromaticMediant', name: 'Mediantes Cromáticas', desc: 'Movimientos a terceras que cambian el color de golpe.', emotions: ['asombro', 'profundidad', 'nostalgia'], astralRange: '3' },
-  { id: 'modalColor', name: 'Color Modal', desc: 'Notas flotantes y drones vamps para un viaje místico.', emotions: ['hipnotico', 'aire'], astralRange: '0-1' },
-  { id: 'cadence', name: 'Cadencia', desc: 'Resoluciones clásicas (V, IV) que cierran o afianzan la tonalidad.', emotions: ['luminoso', 'serenidad'], astralRange: '1-2' },
-  { id: 'free', name: 'Libre (Cualquiera)', desc: 'Exploración abierta sin reglas asignadas.', emotions: ['libre'], astralRange: '0-4' }
+  { id: 'diatonic', name: 'Escalera Diatónica', nameEn: 'Diatonic Ladder', desc: 'Acordes naturales de la tonalidad actual.', descEn: 'Natural chords of the current key.', emotions: ['luminoso', 'serenidad'], astralRange: '1' },
+  { id: 'augmentedPortal', name: 'Portal Aumentado', nameEn: 'Augmented Portal', desc: 'La simetría del acorde aumentado abre puertas a mundos de ensueño.', descEn: 'The symmetry of the augmented chord opens doors to dreamlike worlds.', emotions: ['ingravidez', 'asombro'], astralRange: '3-4' },
+  { id: 'diminishedBridge', name: 'Puente Disminuido', nameEn: 'Diminished Bridge', desc: 'Tensión cromática pasajera para resolver con fuerza.', descEn: 'Passing chromatic tension that resolves with strength.', emotions: ['tension', 'suspenso'], astralRange: '3' },
+  { id: 'chromaticMediant', name: 'Mediantes Cromáticas', nameEn: 'Chromatic Mediants', desc: 'Movimientos a terceras que cambian el color de golpe.', descEn: 'Moves by thirds that suddenly change the color.', emotions: ['asombro', 'profundidad', 'nostalgia'], astralRange: '3' },
+  { id: 'modalColor', name: 'Color Modal', nameEn: 'Modal Color', desc: 'Notas flotantes y drones vamps para un viaje místico.', descEn: 'Floating notes and drone vamps for a mystical journey.', emotions: ['hipnotico', 'aire'], astralRange: '0-1' },
+  { id: 'cadence', name: 'Cadencia', nameEn: 'Cadence', desc: 'Resoluciones clásicas (V, IV) que cierran o afianzan la tonalidad.', descEn: 'Classic resolutions (V, IV) that close or anchor the key.', emotions: ['luminoso', 'serenidad'], astralRange: '1-2' },
+  { id: 'free', name: 'Libre (Cualquiera)', nameEn: 'Free (Any)', desc: 'Exploración abierta sin reglas asignadas.', descEn: 'Open exploration with no assigned rules.', emotions: ['libre'], astralRange: '0-4' }
 ];
 
 interface HarmonyComposerProps {
   onExportToSong?: (songTitle: string, songContent: string) => void;
   seed?: { title: string; chords: string[] } | null;
   onSeedConsumed?: () => void;
+  lang?: 'es' | 'en';
 }
 
-export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong, seed, onSeedConsumed }) => {
+export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong, seed, onSeedConsumed, lang = 'es' }) => {
+  const tr = (es: string, en: string) => (lang === 'en' ? en : es);
+  const PHASE_EN: Record<string, string> = { 'Anclaje': 'Anchor', 'Apertura': 'Opening', 'Elevación': 'Rise', 'Portal': 'Portal', 'Cima': 'Peak', 'Retorno': 'Return' };
+  const TREND_EN: Record<string, string> = { 'subiendo': 'rising', 'bajando': 'falling', 'sostenido': 'steady', '—': '—' };
+  const trPhase = (p: string) => (lang === 'en' ? (PHASE_EN[p] || p) : p);
+  const trTrend = (t: string) => (lang === 'en' ? (TREND_EN[t] || t) : t);
   const [compositions, setCompositions] = useState<Composition[]>([]);
   const [selectedCompId, setSelectedCompId] = useState<string | null>(null);
   const [activePlaySlotIdx, setActivePlaySlotIdx] = useState<number | null>(null);
@@ -440,17 +448,17 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
         <div className="flex items-center gap-3">
           <Sparkles className="text-blue-600 w-6 h-6 animate-pulse" />
           <div>
-            <span className="text-xs font-bold text-blue-600 uppercase tracking-widest font-mono">Taller de Composición</span>
+            <span className="text-xs font-bold text-blue-600 uppercase tracking-widest font-mono">{tr('Taller de Composición', 'Composition Workshop')}</span>
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 value={currentComp?.title || ''}
                 onChange={(e) => updateCurrentComp({ title: e.target.value })}
                 className="text-xl font-extrabold bg-transparent border-none p-0 focus:ring-0 outline-none w-56 font-sans text-zinc-900 dark:text-zinc-100"
-                placeholder="Nombre de la composición"
+                placeholder={tr('Nombre de la composición', 'Composition name')}
               />
               <button onClick={() => setEditKeyModal(true)} className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-xs font-bold flex items-center gap-1 text-zinc-500">
-                <Music size={12} /> {currentTonicLabel} {currentComp?.key.mode === 'minor' ? 'Menor' : 'Mayor'}
+                <Music size={12} /> {currentTonicLabel} {currentComp?.key.mode === 'minor' ? tr('Menor', 'Minor') : tr('Mayor', 'Major')}
               </button>
             </div>
           </div>
@@ -475,7 +483,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
             onClick={handleAddNewComposition}
             className="px-3.5 py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center gap-1.5 hover:bg-blue-700 transition-colors"
           >
-            <Plus size={14} /> Nueva Maqueta
+            <Plus size={14} /> {tr('Nueva Maqueta', 'New Draft')}
           </button>
         </div>
       </div>
@@ -491,7 +499,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                 className={`py-2 px-4 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all text-white ${isPlaying ? 'bg-amber-600 shadow-md shadow-amber-500/20' : 'bg-green-600 shadow-md shadow-green-500/20'}`}
               >
                 {isPlaying ? <Square size={14} /> : <Play size={14} />}
-                {isPlaying ? 'Detener' : 'Reproducir'}
+                {isPlaying ? tr('Detener', 'Stop') : tr('Reproducir', 'Play')}
               </button>
               <button
                 onClick={() => { setIsLooping(v => { isLoopingRef.current = !v; return !v; }); }}
@@ -504,7 +512,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
 
             {/* Tempo */}
             <div className="flex items-center gap-2 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
-              <span className="text-[10px] font-bold text-zinc-500 uppercase px-2 font-mono">Tempo</span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase px-2 font-mono">{tr('Tempo', 'Tempo')}</span>
               <input
                 type="number"
                 min="50"
@@ -536,13 +544,13 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                 onClick={() => updateCurrentComp({ defaultArticulation: 'strum' })}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${currentComp.defaultArticulation === 'strum' ? 'bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 shadow-sm' : 'text-zinc-500'}`}
               >
-                Rasgueo
+                {tr('Rasgueo', 'Strum')}
               </button>
               <button
                 onClick={() => updateCurrentComp({ defaultArticulation: 'arpeggio' })}
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${currentComp.defaultArticulation === 'arpeggio' ? 'bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 shadow-sm' : 'text-zinc-500'}`}
               >
-                Arpegio
+                {tr('Arpegio', 'Arpeggio')}
               </button>
             </div>
 
@@ -555,7 +563,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
               {Object.values(RHYTHM_PATTERNS)
                 .filter(p => p.id !== 'arpegio_pima')
                 .map(p => (
-                  <option key={p.id} value={p.id}>Ritmo: {p.name}</option>
+                  <option key={p.id} value={p.id}>{tr('Ritmo', 'Rhythm')}: {p.name}</option>
                 ))}
             </select>
 
@@ -566,9 +574,9 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
               <button
                 onClick={triggerExport}
                 className="px-4 py-2 bg-zinc-800 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 transition-colors"
-                title="Exportar como canción a la biblioteca"
+                title={tr('Exportar como canción a la biblioteca', 'Export as a song to the library')}
               >
-                <FileSpreadsheet size={14} /> Exportar como Canción
+                <FileSpreadsheet size={14} /> {tr('Exportar como Canción', 'Export as Song')}
               </button>
             )}
           </div>
@@ -578,12 +586,12 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
             {currentComp.slots.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center w-full space-y-3">
                 <Compass className="text-zinc-300 dark:text-zinc-700 w-12 h-12 animate-bounce" />
-                <p className="text-xs text-zinc-400 font-medium">No hay acordes en la línea de tiempo. Comienza tocando el botón de abajo.</p>
+                <p className="text-xs text-zinc-400 font-medium">{tr('No hay acordes en la línea de tiempo. Comienza tocando el botón de abajo.', 'No chords in the timeline yet. Start by tapping the button below.')}</p>
                 <button
                   onClick={openAddChordFlow}
                   className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-500/10"
                 >
-                  Agregar Primer Acorde
+                  {tr('Agregar Primer Acorde', 'Add First Chord')}
                 </button>
               </div>
             ) : (
@@ -618,7 +626,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                               {getChordString(slot.chord)}
                             </span>
                             <div className="text-[9px] text-zinc-400 font-mono tracking-tighter mt-0.5">
-                              {slot.gesture || 'Paso'}
+                              {slot.gesture || tr('Paso', 'Step')}
                             </div>
                           </div>
                           
@@ -636,7 +644,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                               onClick={() => { setEditSlotIdx(i); setTempLyric(''); }}
                               className="text-[9px] text-blue-500 font-bold hover:underline"
                             >
-                              + Letra
+                              {tr('+ Letra', '+ Lyric')}
                             </button>
                           )}
                         </div>
@@ -658,10 +666,10 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
 
                         {/* Top corner options picker */}
                         <div className="absolute top-2 right-2 flex items-center gap-0.5 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 rounded bg-white/80 dark:bg-zinc-900/80 p-0.5">
-                          <button onClick={() => handleDuplicateSlot(i)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-400" title="Duplicar">
+                          <button onClick={() => handleDuplicateSlot(i)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-400" title={tr('Duplicar', 'Duplicate')}>
                             <Copy size={11} />
                           </button>
-                          <button onClick={() => handleDeleteSlot(i)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-red-500" title="Eliminar">
+                          <button onClick={() => handleDeleteSlot(i)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-red-500" title={tr('Eliminar', 'Delete')}>
                             <Trash2 size={11} />
                           </button>
                         </div>
@@ -695,39 +703,39 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
               
               {/* Phase and Level Card */}
               <div className="flex flex-col space-y-2">
-                <span className="text-[10px] font-mono font-bold uppercase text-zinc-400">Arco Astral / Fase</span>
+                <span className="text-[10px] font-mono font-bold uppercase text-zinc-400">{tr('Arco Astral / Fase', 'Astral Arc / Phase')}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-2xl font-black font-sans text-zinc-800 dark:text-zinc-100">
-                    Fase {phaseInfo.phase}
+                    {tr('Fase', 'Phase')} {trPhase(phaseInfo.phase)}
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                    Nivel {Math.round(phaseInfo.level)}
+                    {tr('Nivel', 'Level')} {Math.round(phaseInfo.level)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-                  <span>Tendencia:</span>
+                  <span>{tr('Tendencia:', 'Trend:')}</span>
                   <span className="font-bold flex items-center gap-0.5 uppercase">
                     {phaseInfo.trend === 'subiendo' ? <ArrowUpRight className="text-green-500" size={14} /> : phaseInfo.trend === 'bajando' ? <ArrowDownRight className="text-amber-500" size={14} /> : <RefreshCw className="text-blue-500 font-semibold" size={12} />}
-                    {phaseInfo.trend}
+                    {trTrend(phaseInfo.trend)}
                   </span>
                 </div>
               </div>
 
               {/* Progress Target */}
               <div className="flex flex-col space-y-2">
-                <span className="text-[10px] font-mono font-bold uppercase text-zinc-400">Apuntando hacia</span>
+                <span className="text-[10px] font-mono font-bold uppercase text-zinc-400">{tr('Apuntando hacia', 'Pointing to')}</span>
                 <span className="text-lg font-extrabold text-zinc-700 dark:text-zinc-300">
-                  {phaseInfo.pointingTo}
+                  {trPhase(phaseInfo.pointingTo)}
                 </span>
                 <p className="text-[10px] text-zinc-500">
-                  Heurística calculada en base al volumen emocional de los últimos {slotsAverageWindowDescription()}.
+                  {tr('Heurística calculada en base al volumen emocional de los últimos tres acordes.', 'Heuristic based on the emotional volume of the last three chords.')}
                 </p>
               </div>
 
               {/* Target Coverage Meter (REQ-FAS-01) */}
               <div className="flex flex-col space-y-2 justify-center">
                 <div className="flex justify-between text-xs text-zinc-500">
-                  <span>Cobertura del Arco</span>
+                  <span>{tr('Cobertura del Arco', 'Arc Coverage')}</span>
                   <span className="font-mono font-bold">{Math.round(phaseInfo.coverage * 100)}%</span>
                 </div>
                 
@@ -743,7 +751,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                 {phaseInfo.coverage < 0.4 && (
                   <div className="flex items-center gap-1.5 text-[9px] text-amber-600 font-bold uppercase tracking-tight mt-1 animate-pulse">
                     <AlertCircle size={10} />
-                    <span>Sección inestable: Te falta aterrizar la tierra (Anclaje)</span>
+                    <span>{tr('Sección inestable: Te falta aterrizar (Anclaje)', 'Unstable section: you still need to land (Anchor)')}</span>
                   </div>
                 )}
               </div>
@@ -754,7 +762,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
       ) : (
         <div className="flex flex-col items-center justify-center p-12 text-center text-zinc-400 space-y-3">
           <Sparkles className="text-zinc-300 dark:text-zinc-800 w-16 h-16 animate-pulse" />
-          <p className="text-sm font-sans">No tienes ninguna composición creada aún. Toca "Nueva Maqueta" arriba para inaugurar tu taller.</p>
+          <p className="text-sm font-sans">{tr('No tienes ninguna composición creada aún. Toca "Nueva Maqueta" arriba para inaugurar tu taller.', 'You have no compositions yet. Tap "New Draft" above to open your workshop.')}</p>
         </div>
       )}
 
@@ -779,10 +787,10 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                   )}
                   <h3 className="text-lg font-black font-sans">
                     {wizardStep === 1
-                      ? 'Paso 1: ¿Qué herramienta armónica usar?'
+                      ? tr('Paso 1: ¿Qué herramienta armónica usar?', 'Step 1: Which harmonic tool?')
                       : (currentComp && currentComp.slots.length === 0
-                        ? 'Elige el primer acorde (escalera del tono)'
-                        : 'Paso 2: Elige tu próximo acorde')}
+                        ? tr('Elige el primer acorde (escalera del tono)', 'Choose the first chord (key ladder)')
+                        : tr('Paso 2: Elige tu próximo acorde', 'Step 2: Choose your next chord'))}
                   </h3>
                 </div>
                 <button
@@ -804,8 +812,8 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                         className="p-4 bg-zinc-50 hover:bg-zinc-100/50 dark:bg-zinc-900/60 dark:hover:bg-zinc-800 rounded-2xl text-left border border-zinc-200 dark:border-zinc-800/80 transition-all flex flex-col justify-between h-36"
                       >
                         <div>
-                          <p className="font-extrabold text-sm text-zinc-800 dark:text-zinc-100">{tool.name}</p>
-                          <p className="text-[10px] text-zinc-400 mt-1.5 leading-relaxed">{tool.desc}</p>
+                          <p className="font-extrabold text-sm text-zinc-800 dark:text-zinc-100">{lang === 'en' ? tool.nameEn : tool.name}</p>
+                          <p className="text-[10px] text-zinc-400 mt-1.5 leading-relaxed">{lang === 'en' ? tool.descEn : tool.desc}</p>
                         </div>
                         <div className="flex justify-between items-center w-full pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50">
                           <span className="text-[9px] font-bold text-blue-600 uppercase tracking-wider font-mono">
@@ -823,10 +831,10 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                 ) : (
                   <div className="space-y-3">
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest font-mono">
-                      Acordes Candidatos ({getWizardCandidates().length})
+                      {tr('Acordes Candidatos', 'Candidate Chords')} ({getWizardCandidates().length})
                     </p>
                     <p className="text-[10px] text-zinc-400 italic flex items-center gap-1">
-                      <HelpCircle size={11} /> Las emociones son tendencias, no garantías: una guía, no una regla.
+                      <HelpCircle size={11} /> {tr('Las emociones son tendencias, no garantías: una guía, no una regla.', 'Emotions are tendencies, not guarantees: a guide, not a rule.')}
                     </p>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -873,7 +881,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                             <button
                               onClick={(e) => handlePreviewCandidate(cand, e)}
                               className="absolute bottom-3 right-3 p-2 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500"
-                              title="Oír sugerencia"
+                              title={tr('Oír sugerencia', 'Hear suggestion')}
                             >
                               <Volume2 size={13} />
                             </button>
@@ -895,20 +903,20 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
         {editSlotIdx !== null && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-3xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
-              <h3 className="text-base font-extrabold mb-4">Escribir Letra sobre el Acorde</h3>
+              <h3 className="text-base font-extrabold mb-4">{tr('Escribir Letra sobre el Acorde', 'Write Lyric over the Chord')}</h3>
               <input
                 type="text"
                 value={tempLyric}
                 onChange={(e) => setTempLyric(e.target.value)}
-                placeholder="Letra de la sección (ej. 'De tu luz...')"
+                placeholder={tr("Letra de la sección (ej. 'De tu luz...')", "Section lyric (e.g. 'From your light...')")}
                 className="w-full p-3 border-none bg-zinc-100 dark:bg-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 mb-6 text-sm"
               />
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setEditSlotIdx(null)} className="px-4 py-2 text-xs font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">
-                  Cancelar
+                  {tr('Cancelar', 'Cancel')}
                 </button>
                 <button onClick={handleSaveLyrics} className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm shadow-blue-500/10">
-                  Guardar Letra
+                  {tr('Guardar Letra', 'Save Lyric')}
                 </button>
               </div>
             </div>
@@ -921,10 +929,10 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
         {editKeyModal && currentComp && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-3xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-2xl space-y-6">
-              <h3 className="text-base font-extrabold">Elegir Tonalidad de Maqueta</h3>
-              
+              <h3 className="text-base font-extrabold">{tr('Elegir Tonalidad de Maqueta', 'Choose Draft Key')}</h3>
+
               <div className="space-y-3">
-                <label className="text-[10px] font-mono font-bold uppercase text-zinc-400">Nota Tónica</label>
+                <label className="text-[10px] font-mono font-bold uppercase text-zinc-400">{tr('Nota Tónica', 'Tonic Note')}</label>
                 <div className="grid grid-cols-4 gap-2">
                   {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map((note, pitch) => (
                     <button
@@ -939,19 +947,19 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-mono font-bold uppercase text-zinc-400">Modo</label>
+                <label className="text-[10px] font-mono font-bold uppercase text-zinc-400">{tr('Modo', 'Mode')}</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => updateCurrentComp({ key: { ...currentComp.key, mode: 'major' } })}
                     className={`py-2 rounded-xl text-xs font-extrabold border ${currentComp.key.mode === 'major' ? 'border-blue-600 bg-blue-50/50 text-blue-600' : 'border-zinc-200 dark:border-zinc-800'}`}
                   >
-                    Modo Mayor
+                    {tr('Modo Mayor', 'Major')}
                   </button>
                   <button
                     onClick={() => updateCurrentComp({ key: { ...currentComp.key, mode: 'minor' } })}
                     className={`py-2 rounded-xl text-xs font-extrabold border ${currentComp.key.mode === 'minor' ? 'border-blue-600 bg-blue-50/50 text-blue-600' : 'border-zinc-200 dark:border-zinc-800'}`}
                   >
-                    Modo Menor
+                    {tr('Modo Menor', 'Minor')}
                   </button>
                 </div>
               </div>
@@ -960,7 +968,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                 onClick={() => setEditKeyModal(false)}
                 className="w-full py-3 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-bold rounded-xl text-xs"
               >
-                Listo
+                {tr('Listo', 'Done')}
               </button>
             </div>
           </div>

@@ -1762,6 +1762,7 @@ export default function App() {
                 >
                   <UtilitariosHub
                     onExportToSong={handleAddSongFromWorkshop}
+                    lang={(profile?.language || 'en') as 'es' | 'en'}
                   />
                 </motion.div>
               ) : isEditing ? (
