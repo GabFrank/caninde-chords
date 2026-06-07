@@ -1,3 +1,10 @@
+# [2.8.0](https://github.com/GabFrank/caninde-chords/compare/v2.7.0...v2.8.0) (2026-06-07)
+
+
+### Features
+
+* **audio:** guitarra con samples reales (SoundFont) + fallback de síntesis ([853977e](https://github.com/GabFrank/caninde-chords/commit/853977e566f1255f27a92d7d099a101defaca44e))
+
 # [2.7.0](https://github.com/GabFrank/caninde-chords/compare/v2.6.0...v2.7.0) (2026-06-07)
 
 
