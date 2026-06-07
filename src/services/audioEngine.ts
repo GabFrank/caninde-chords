@@ -167,78 +167,65 @@ export class BaseAudioEngine {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       this.ctx = new AudioCtx();
       this.masterVolumeNode = this.ctx.createGain();
-      this.masterVolumeNode.gain.value = 0.55;
+      this.masterVolumeNode.gain.value = 0.5;
 
-      // 1. ACOUSTIC GUITAR TONE-SHAPING FILTERS
-      // We shape the frequency response of the synthesizer to sound like a rich wooden resonator
-      
-      // A. Deep wood soundboard body resonance
+      // Gentle tone shaping: warm low body + soft high roll-off to remove the
+      // harsh/shrill fizz, without muffling the instrument.
       const lowShelf = this.ctx.createBiquadFilter();
       lowShelf.type = 'lowshelf';
-      lowShelf.frequency.value = 210;
-      lowShelf.gain.value = 5.5; // Boost warm bottom-end wood resonance
+      lowShelf.frequency.value = 200;
+      lowShelf.gain.value = 3.0; // subtle wood warmth
 
-      // B. Peaking filter to add wood warmth and clear presence, while scooping nasal mids
-      const midWarmth = this.ctx.createBiquadFilter();
-      midWarmth.type = 'peaking';
-      midWarmth.frequency.value = 350;
-      midWarmth.Q.value = 0.85;
-      midWarmth.gain.value = 2.5;
+      // Tame nasal/harsh upper-mids a touch (the main source of "chillón")
+      const presenceDip = this.ctx.createBiquadFilter();
+      presenceDip.type = 'peaking';
+      presenceDip.frequency.value = 2600;
+      presenceDip.Q.value = 1.0;
+      presenceDip.gain.value = -4.5;
 
-      // C. High-shelf dampening filter to simulate a mellow, cozy nylon/bronze string pluck
-      const highWarmthCut = this.ctx.createBiquadFilter();
-      highWarmthCut.type = 'highshelf';
-      highWarmthCut.frequency.value = 3800;
-      highWarmthCut.gain.value = -9.0; // Smooths out harsh buzz/metallic hiss
+      // Gentle low-pass to smooth the very top end (12 dB/oct, soft Q)
+      const highCut = this.ctx.createBiquadFilter();
+      highCut.type = 'lowpass';
+      highCut.frequency.value = 5200;
+      highCut.Q.value = 0.5;
 
-      // Connect tone shaping chain
+      // Dry chain
       this.masterVolumeNode.connect(lowShelf);
-      lowShelf.connect(midWarmth);
-      midWarmth.connect(highWarmthCut);
-      highWarmthCut.connect(this.ctx.destination);
+      lowShelf.connect(presenceDip);
+      presenceDip.connect(highCut);
+      highCut.connect(this.ctx.destination);
 
-      // 2. AMBIENT STEREO COZY REVERB & DELAY SPACE
-      // Creates a cozy, mesmerizing sacred-grove environment in the background
-      const delayL = this.ctx.createDelay(1.0);
-      const delayR = this.ctx.createDelay(1.0);
-      const feedbackL = this.ctx.createGain();
-      const feedbackR = this.ctx.createGain();
-      const wetLevel = this.ctx.createGain();
-
-      delayL.delayTime.value = 0.360; // 360ms delay
-      delayR.delayTime.value = 0.480; // 480ms delay for wide stereo field
-
-      feedbackL.gain.value = 0.32; // Deep lingering tail
-      feedbackR.gain.value = 0.32;
-      wetLevel.gain.value = 0.20; // Elegant level of space, wet blend
-
-      // Connect delay blocks
-      highWarmthCut.connect(delayL);
-      highWarmthCut.connect(delayR);
-
-      delayL.connect(feedbackL);
-      feedbackL.connect(delayL); // feedback loop left
-
-      delayR.connect(feedbackR);
-      feedbackR.connect(delayR); // feedback loop right
-
-      // Cross-feed slightly for deep spatial stereo expansion
-      const crossFeed = this.ctx.createGain();
-      crossFeed.gain.value = 0.12;
-      feedbackL.connect(crossFeed);
-      crossFeed.connect(delayR);
-
-      // Merge and route wet signal to main output
-      const stereoMerger = this.ctx.createChannelMerger(2);
-      delayL.connect(stereoMerger, 0, 0);
-      delayR.connect(stereoMerger, 0, 1);
-      
-      stereoMerger.connect(wetLevel);
-      wetLevel.connect(this.ctx.destination);
+      // Natural reverb via convolution (smooth, decaying impulse) — replaces the
+      // old feedback-delay echo that rang metallic.
+      const convolver = this.ctx.createConvolver();
+      convolver.buffer = this.makeReverbIR(2.2, 3.2);
+      const wet = this.ctx.createGain();
+      wet.gain.value = 0.16; // tasteful space, not washy
+      highCut.connect(convolver);
+      convolver.connect(wet);
+      wet.connect(this.ctx.destination);
 
     } catch (e) {
       console.error('Failed to initialize AudioContext with acoustic processing', e);
     }
+  }
+
+  // Builds a smooth, lowpassed exponential-decay impulse response for a natural reverb tail.
+  private makeReverbIR(seconds: number, decay: number): AudioBuffer {
+    const rate = this.ctx!.sampleRate;
+    const len = Math.max(1, Math.floor(rate * seconds));
+    const ir = this.ctx!.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const env = Math.pow(1 - i / len, decay);
+        const white = Math.random() * 2 - 1;
+        lp = lp + 0.5 * (white - lp); // soften the tail to avoid fizzy reverb
+        d[i] = lp * env;
+      }
+    }
+    return ir;
   }
 
   setMasterVolume(vol: number) {
@@ -248,8 +235,9 @@ export class BaseAudioEngine {
     }
   }
 
-  // Pure Karplus-Strong Physical pluck string synthesizer with warm acoustic tuning
-  getPluckedStringBuffer(midiNote: number, durationSec: number = 3.0): AudioBuffer {
+  // Warm Karplus-Strong pluck: lowpassed excitation + a one-pole loop filter whose
+  // damping increases with pitch, so high notes are mellow instead of shrill.
+  getPluckedStringBuffer(midiNote: number, durationSec: number = 3.2): AudioBuffer {
     this.init();
     const key = midiNote;
     if (this.buffersCache[key]) {
@@ -257,11 +245,10 @@ export class BaseAudioEngine {
     }
 
     const sampleRate = this.ctx!.sampleRate;
-    const numSamples = sampleRate * durationSec;
+    const numSamples = Math.floor(sampleRate * durationSec);
     const buffer = this.ctx!.createBuffer(1, numSamples, sampleRate);
     const data = buffer.getChannelData(0);
 
-    // Fundamental frequency calculation
     const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
     const N = Math.round(sampleRate / frequency);
 
@@ -269,50 +256,38 @@ export class BaseAudioEngine {
       return buffer;
     }
 
-    // 1. Initialise raw noise for excitation
-    const rawNoise = new Float32Array(N);
-    for (let i = 0; i < N; i++) {
-      // Adding a little exponential drop inside the pluck burst for a more organic snap
-      const scale = Math.exp(-3.5 * (i / N));
-      rawNoise[i] = (Math.random() * 2.0 - 1.0) * scale;
-    }
-
-    // 2. Binomial 3-point filter window to smooth out harsh high-freq transient clicks
-    // converting noise-bursts into soft organic finger pluck excitation
+    // 1. Excitation: white noise through a one-pole low-pass = soft, woody finger pluck
+    //    (full-spectrum noise is what made the original attack harsh/buzzy).
     const delayLine = new Float32Array(N);
+    let e = 0;
+    let mean = 0;
     for (let i = 0; i < N; i++) {
-      const prev = rawNoise[(i - 1 + N) % N];
-      const curr = rawNoise[i];
-      const next = rawNoise[(i + 1) % N];
-      delayLine[i] = (prev * 0.25) + (curr * 0.5) + (next * 0.25);
+      const w = Math.random() * 2 - 1;
+      e = e + 0.40 * (w - e); // warm low-passed burst
+      delayLine[i] = e;
+      mean += e;
     }
+    mean /= N;
+    for (let i = 0; i < N; i++) delayLine[i] -= mean; // remove DC offset
 
-    // 3. Continuous time-domain physical model loop with lowpass averaging (feedback)
-    // Lower bass notes sustain longer (slower wood decay) for nice ceremonial resonance
-    const baseDecay = 0.9958;
-    const decay = Math.min(0.9968, baseDecay - (midiNote - 40) * 0.00012);
-    let p = 0; // Delay pointer
-    
+    // 2. Physical loop. R = energy decay (bass rings longer). S = loop low-pass
+    //    amount; higher for treble so the top end is damped and not shrill.
+    const R = Math.min(0.9990, 0.9965 - (midiNote - 40) * 0.00009);
+    const S = Math.min(0.62, 0.22 + (midiNote - 40) * 0.0065);
+    let lp = 0;
+    let p = 0;
     for (let i = 0; i < numSamples; i++) {
-      const curVal = delayLine[p];
-      const nextIdx = (p + 1) % N;
-      const nextVal = delayLine[nextIdx];
-      
-      // Lowpass feedback filter equation: average current and next samples
-      const feedback = (curVal + nextVal) * 0.5 * decay;
-      
-      // Write into the buffer
-      data[i] = curVal;
-      
-      // Update delay line for the next period cycle
-      delayLine[p] = feedback;
-      p = nextIdx;
+      const x = delayLine[p];
+      data[i] = x;
+      lp = (1 - S) * x + S * lp; // one-pole low-pass in the feedback loop
+      delayLine[p] = R * lp;
+      p = (p + 1) % N;
     }
 
-    // Apply highpass to remove DC drift and smooth tail decay
-    for (let i = numSamples - 1000; i < numSamples; i++) {
-      const ramp = (numSamples - i) / 1000;
-      data[i] *= ramp;
+    // 3. Smooth tail fade-out to avoid an abrupt cut
+    const fade = Math.min(2000, numSamples);
+    for (let i = numSamples - fade; i < numSamples; i++) {
+      data[i] *= (numSamples - i) / fade;
     }
 
     this.buffersCache[key] = buffer;
@@ -336,19 +311,29 @@ export class BaseAudioEngine {
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
 
-    const gainNode = this.ctx.createGain();
-    
-    // Orgánicas variations of volume based on frequency pitch
-    const freqFactor = 1.0 - Math.min(0.5, (midiNote - 40) / 60) * 0.3;
-    gainNode.gain.setValueAtTime(velocity * freqFactor, absoluteTime);
-    
-    // Sutil pluck envelope curve
-    gainNode.gain.exponentialRampToValueAtTime(0.005, absoluteTime + 2.5);
+    const frequency = 440 * Math.pow(2, (midiNote - 69) / 12);
 
-    source.connect(gainNode);
+    // Per-note low-pass that tracks pitch: keeps highs in check (less shrill) while
+    // letting low notes keep their body.
+    const noteFilter = this.ctx.createBiquadFilter();
+    noteFilter.type = 'lowpass';
+    noteFilter.frequency.value = Math.max(1400, Math.min(5000, frequency * 6));
+    noteFilter.Q.value = 0.6;
+
+    const gainNode = this.ctx.createGain();
+    const freqFactor = 1.0 - Math.min(0.5, (midiNote - 40) / 60) * 0.35;
+    const peak = Math.max(0.0008, velocity * freqFactor);
+
+    // Soft 6 ms attack to remove the harsh click, then a natural exponential decay.
+    gainNode.gain.setValueAtTime(0.0001, absoluteTime);
+    gainNode.gain.linearRampToValueAtTime(peak, absoluteTime + 0.006);
+    gainNode.gain.exponentialRampToValueAtTime(0.004, absoluteTime + 2.6);
+
+    source.connect(noteFilter);
+    noteFilter.connect(gainNode);
     gainNode.connect(this.masterVolumeNode!);
     source.start(absoluteTime);
-    source.stop(absoluteTime + 3.0);
+    source.stop(absoluteTime + 3.2);
 
     const activeItem = { source, gain: gainNode };
     this.activeSources.push(activeItem);
