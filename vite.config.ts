@@ -15,9 +15,26 @@ export default defineConfig(({mode}) => {
     plugins: [
       react(), 
       tailwindcss(),
+      // Emite /version.json en el build para poder verificar la versión publicada
+      // desde el navegador (franco-control.web.app/version.json).
+      {
+        name: 'emit-version-json',
+        generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'version.json',
+            source: JSON.stringify({ version: pkg.version, builtAt: new Date().toISOString() }),
+          });
+        },
+      },
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['CanindeChords.png'],
+        workbox: {
+          // version.json nunca se cachea ni se sirve como index.html: siempre va a la red.
+          globIgnores: ['**/node_modules/**/*', '**/version.json'],
+          navigateFallbackDenylist: [/^\/version\.json$/],
+        },
         manifest: {
           name: 'CanindeChords',
           short_name: 'CanindeChords',
