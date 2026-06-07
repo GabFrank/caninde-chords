@@ -171,7 +171,7 @@ export class BaseAudioEngine {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       this.ctx = new AudioCtx();
       this.masterVolumeNode = this.ctx.createGain();
-      this.masterVolumeNode.gain.value = 0.5;
+      this.masterVolumeNode.gain.value = 0.85;
 
       // Gentle tone shaping: warm low body + soft high roll-off to remove the
       // harsh/shrill fizz, without muffling the instrument.
@@ -193,11 +193,20 @@ export class BaseAudioEngine {
       highCut.frequency.value = 8500;
       highCut.Q.value = 0.4;
 
+      // Master limiter: lets us run louder without clipping when full chords play.
+      const limiter = this.ctx.createDynamicsCompressor();
+      limiter.threshold.value = -6;
+      limiter.knee.value = 8;
+      limiter.ratio.value = 6;
+      limiter.attack.value = 0.003;
+      limiter.release.value = 0.25;
+      limiter.connect(this.ctx.destination);
+
       // Dry chain
       this.masterVolumeNode.connect(lowShelf);
       lowShelf.connect(presenceDip);
       presenceDip.connect(highCut);
-      highCut.connect(this.ctx.destination);
+      highCut.connect(limiter);
 
       // Natural reverb via convolution (smooth, decaying impulse) — replaces the
       // old feedback-delay echo that rang metallic.
@@ -207,7 +216,7 @@ export class BaseAudioEngine {
       wet.gain.value = 0.16; // tasteful space, not washy
       highCut.connect(convolver);
       convolver.connect(wet);
-      wet.connect(this.ctx.destination);
+      wet.connect(limiter);
 
       // Begin loading the real sampled guitar in the background.
       this.loadSoundfont();
@@ -342,7 +351,7 @@ export class BaseAudioEngine {
     // and fall back to synthesis so there is never silence.
     if (this.sfReady && this.sf) {
       try {
-        this.sf.play(midiNote, absoluteTime, { gain: Math.max(0.05, Math.min(1, velocity)) });
+        this.sf.play(midiNote, absoluteTime, { gain: Math.max(0.05, Math.min(2, velocity * 1.4)) });
         return;
       } catch (e) {
         // fall through to synthesis on any sampler error
