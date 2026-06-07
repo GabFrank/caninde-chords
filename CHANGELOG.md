@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/GabFrank/caninde-chords/compare/v2.0.0...v2.0.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* mostrar la versión real de la app leyéndola desde package.json ([58b30c7](https://github.com/GabFrank/caninde-chords/commit/58b30c7c545d1ba6f1199af573de2edf99f7e330))
+
 # [2.0.0](https://github.com/GabFrank/caninde-chords/compare/v1.0.0...v2.0.0) (2026-06-07)
 
 
