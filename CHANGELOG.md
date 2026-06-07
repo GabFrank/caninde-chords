@@ -1,3 +1,10 @@
+# [2.10.0](https://github.com/GabFrank/caninde-chords/compare/v2.9.0...v2.10.0) (2026-06-07)
+
+
+### Features
+
+* **taller:** menú de acciones por acorde al tocar la tarjeta ([493e73e](https://github.com/GabFrank/caninde-chords/commit/493e73e9804dec5c145e2a1bb699913d4522c95e))
+
 # [2.9.0](https://github.com/GabFrank/caninde-chords/compare/v2.8.0...v2.9.0) (2026-06-07)
 
 
