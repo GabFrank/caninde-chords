@@ -34,7 +34,11 @@ interface Gesto {
   chords: string[];
 }
 
-export const HarmonyManual: React.FC = () => {
+interface HarmonyManualProps {
+  onOpenInComposer?: (chords: string[], title: string) => void;
+}
+
+export const HarmonyManual: React.FC<HarmonyManualProps> = ({ onOpenInComposer }) => {
   const [activeChapter, setActiveChapter] = useState<number>(0);
   const [useTransposition, setUseTransposition] = useState<boolean>(false);
   const [selectedTonic, setSelectedTonic] = useState<number>(0); // Default C
@@ -1186,6 +1190,15 @@ export const HarmonyManual: React.FC = () => {
                           >
                             <Play size={10} fill="currentColor" /> Reprod. Completo
                           </button>
+                          {onOpenInComposer && (
+                            <button
+                              onClick={() => onOpenInComposer(recipe.chords, recipe.name)}
+                              title="Abrir esta progresión en el Compositor"
+                              className="px-3.5 py-1.5 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-xl text-[10px] font-black flex items-center gap-1 transition-all"
+                            >
+                              <Wand2 size={10} /> Abrir en Compositor
+                            </button>
+                          )}
                         </div>
                       </div>
 

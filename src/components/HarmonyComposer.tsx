@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Square, Plus, Trash2, Copy, Sparkles, AlertCircle, Compass, HelpCircle, ArrowUpRight, ArrowDownRight, RefreshCw, Save, FileSpreadsheet, Eye, Music, Edit2, Volume2, ArrowLeft, ArrowRight, ChevronDown, Check } from 'lucide-react';
-import { PitchClass, Quality, Chord, Tool, Slot, Composition, getCandidates, computePhase, analyzeGesture, getChordString, getPitchClassName, getDefaultAstralFor, SongExportAdapter, mod12, parsePitchClass } from '../lib/harmonyEngine';
+import { PitchClass, Quality, Chord, Tool, Slot, Composition, getCandidates, computePhase, analyzeGesture, getChordString, getPitchClassName, getDefaultAstralFor, getDefaultEmotionFor, parseChordString, SongExportAdapter, mod12, parsePitchClass } from '../lib/harmonyEngine';
 import { audioEngine, getVoicingForChord, RHYTHM_PATTERNS } from '../services/audioEngine';
 import { db, auth } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot } from 'firebase/firestore';
@@ -52,9 +52,11 @@ const TOOLS_INFO: ToolInfo[] = [
 
 interface HarmonyComposerProps {
   onExportToSong?: (songTitle: string, songContent: string) => void;
+  seed?: { title: string; chords: string[] } | null;
+  onSeedConsumed?: () => void;
 }
 
-export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong }) => {
+export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong, seed, onSeedConsumed }) => {
   const [compositions, setCompositions] = useState<Composition[]>([]);
   const [selectedCompId, setSelectedCompId] = useState<string | null>(null);
   const [activePlaySlotIdx, setActivePlaySlotIdx] = useState<number | null>(null);
@@ -108,6 +110,50 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
       if (playTimerRef.current) clearInterval(playTimerRef.current);
     };
   }, [userId]);
+
+  // REQ-MAN-04: "Abrir en el Compositor" — build a composition from a seed progression.
+  useEffect(() => {
+    if (!seed || !seed.chords || seed.chords.length === 0) return;
+    let prev: Chord | null = null;
+    const slots: Slot[] = seed.chords.map((cs, i) => {
+      const chord = parseChordString(cs) || { root: 0, quality: 'major' as Quality };
+      let gesture: string | null = 'Punto de partida';
+      let emotion = 'libre';
+      let astral = getDefaultAstralFor(chord.quality);
+      if (prev) {
+        const a = analyzeGesture(prev, chord);
+        gesture = a.gesture; emotion = a.emotion; astral = a.astral;
+      }
+      prev = chord;
+      return {
+        id: `seed_${Date.now()}_${i}`,
+        chord, durationBeats: 4,
+        toolUsed: (i === 0 ? 'free' : 'diatonic') as Tool,
+        gesture, emotion, astralLevel: astral,
+        voicing: getVoicingForChord(chord)
+      };
+    });
+
+    const newComp = {
+      title: seed.title || 'Receta del Manual',
+      key: { tonic: slots[0]?.chord.root ?? 0, mode: 'major' as const },
+      tempo: { bpm: 80, timeSignature: [4, 4] as [number, number] },
+      defaultArticulation: 'strum' as const,
+      rhythmPatternId: 'balada',
+      instrument: 'guitar' as const,
+      slots,
+      meta: {
+        createdWith: 'CanindeSong/Utilitarios', specVersion: '1.0',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      }
+    };
+
+    addDoc(collection(db, 'compositions'), { ...newComp, userId })
+      .then(ref => setSelectedCompId(ref.id))
+      .catch(e => console.error('Error creando maqueta desde el Manual', e))
+      .finally(() => onSeedConsumed?.());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed]);
 
   // Create empty default composition
   const handleAddNewComposition = async () => {

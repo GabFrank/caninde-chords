@@ -13,6 +13,13 @@ interface UtilitariosHubProps {
 
 export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong }) => {
   const [activeSubTab, setActiveSubTab] = useState<'tuner' | 'composer' | 'manual'>('composer'); // default composer as requested
+  const [composerSeed, setComposerSeed] = useState<{ title: string; chords: string[] } | null>(null);
+
+  // REQ-MAN-04: abrir una progresión del Manual en el Compositor
+  const handleOpenInComposer = (chords: string[], title: string) => {
+    setComposerSeed({ chords, title });
+    setActiveSubTab('composer');
+  };
 
   return (
     <div id="utilitarios-hub-root" className="w-full flex flex-col space-y-6">
@@ -59,7 +66,11 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong }
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.18 }}
             >
-              <HarmonyComposer onExportToSong={onExportToSong} />
+              <HarmonyComposer
+                onExportToSong={onExportToSong}
+                seed={composerSeed}
+                onSeedConsumed={() => setComposerSeed(null)}
+              />
             </motion.div>
           )}
 
@@ -83,7 +94,7 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong }
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.18 }}
             >
-              <HarmonyManual />
+              <HarmonyManual onOpenInComposer={handleOpenInComposer} />
             </motion.div>
           )}
         </AnimatePresence>
