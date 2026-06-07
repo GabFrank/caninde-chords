@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/GabFrank/caninde-chords/compare/v2.1.2...v2.2.0) (2026-06-07)
+
+
+### Features
+
+* mejoras del Compositor (loop, dirección, duración, round-trip robusto) ([6bd15a6](https://github.com/GabFrank/caninde-chords/commit/6bd15a6578c9ad92ccffe51ffd6a3ce5fbb5ffe9))
+
 ## [2.1.2](https://github.com/GabFrank/caninde-chords/compare/v2.1.1...v2.1.2) (2026-06-07)
 
 
