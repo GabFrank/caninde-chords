@@ -1,3 +1,10 @@
+# [2.12.0](https://github.com/GabFrank/caninde-chords/compare/v2.11.0...v2.12.0) (2026-06-07)
+
+
+### Features
+
+* **taller:** rediseño de la línea de tiempo (secciones + chips + repro flexible) ([12162e5](https://github.com/GabFrank/caninde-chords/commit/12162e5689ba96bb62d68eaf027e9afa8f57bee1))
+
 # [2.11.0](https://github.com/GabFrank/caninde-chords/compare/v2.10.0...v2.11.0) (2026-06-07)
 
 
