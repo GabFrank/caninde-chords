@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Square, Plus, Trash2, Copy, Sparkles, AlertCircle, Compass, HelpCircle, ArrowUpRight, ArrowDownRight, RefreshCw, Save, FileSpreadsheet, Eye, Music, Edit2, Volume2, ArrowLeft, ArrowRight, ChevronDown, Check } from 'lucide-react';
 import { PitchClass, Quality, Chord, Tool, Slot, Composition, getCandidates, computePhase, analyzeGesture, getChordString, getPitchClassName, getDefaultAstralFor, SongExportAdapter, mod12, parsePitchClass } from '../lib/harmonyEngine';
-import { audioEngine, getVoicingForChord } from '../services/audioEngine';
+import { audioEngine, getVoicingForChord, RHYTHM_PATTERNS } from '../services/audioEngine';
 import { db, auth } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot } from 'firebase/firestore';
 
@@ -352,13 +352,14 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
       const slot = currentComp.slots[idx];
       setActivePlaySlotIdx(idx);
 
-      // Trigger chord pluck
+      // Trigger the slot with its rhythm pattern (Apéndice B)
       const voicing = slot.voicing || getVoicingForChord(slot.chord);
-      audioEngine.scheduleChord(voicing, 0, {
-        articulation: slot.articulation || currentComp.defaultArticulation
-      });
+      const effArt = slot.articulation || currentComp.defaultArticulation;
+      const patId = effArt === 'arpeggio' ? 'arpegio_pima' : (slot.rhythmPatternId || currentComp.rhythmPatternId);
+      const pattern = RHYTHM_PATTERNS[patId] || RHYTHM_PATTERNS['balada'];
+      audioEngine.scheduleRhythm(voicing, pattern, currentComp.tempo.bpm, slot.durationBeats);
 
-      // Optionally lock low drone base pitch if drone, or play drone
+      // Drone pedal on the tonic for the ceremonial pattern (REQ-AUD-04)
       if (currentComp.rhythmPatternId === 'drone_lento') {
         audioEngine.triggerDrone(40 + currentComp.key.tonic, true); // root pedal
       }
@@ -498,10 +499,11 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
               onChange={(e) => updateCurrentComp({ rhythmPatternId: e.target.value })}
               className="py-1.5 px-3 rounded-xl border-none outline-none text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
             >
-              <option value="balada">Rhythm: Balada (Pop)</option>
-              <option value="vals">Rhythm: Vals (3/4)</option>
-              <option value="rasgueado">Rhythm: Rasgueado Folclórico</option>
-              <option value="drone_lento">Rhythm: Drone Pedal (Ceremonial)</option>
+              {Object.values(RHYTHM_PATTERNS)
+                .filter(p => p.id !== 'arpegio_pima')
+                .map(p => (
+                  <option key={p.id} value={p.id}>Ritmo: {p.name}</option>
+                ))}
             </select>
 
             <div className="flex-1" />

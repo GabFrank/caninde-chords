@@ -12,6 +12,58 @@ export interface PlayOpts {
   patternId?: string;
 }
 
+// Rhythm patterns (Apéndice B / §7.2). `at` = subdivision index from the bar start.
+export interface RhythmStep {
+  at: number;
+  action: 'strumDown' | 'strumUp' | 'arp' | 'bass' | 'rest';
+  accent?: boolean;
+  arpIndex?: number;
+}
+export interface RhythmPattern {
+  id: string;
+  name: string;
+  beatsPerBar: number;
+  subdivision: number; // subdivisions per beat (2 = eighths)
+  steps: RhythmStep[];
+}
+
+export const RHYTHM_PATTERNS: Record<string, RhythmPattern> = {
+  // balada: D · D · | U · D U  (8 corcheas en 4/4)
+  balada: {
+    id: 'balada', name: 'Balada (Pop)', beatsPerBar: 4, subdivision: 2,
+    steps: [
+      { at: 0, action: 'strumDown', accent: true }, { at: 2, action: 'strumDown' },
+      { at: 4, action: 'strumUp' }, { at: 6, action: 'strumDown' }, { at: 7, action: 'strumUp' }
+    ]
+  },
+  // vals 3/4: bass D D (acentúa tiempo 1)
+  vals: {
+    id: 'vals', name: 'Vals (3/4)', beatsPerBar: 3, subdivision: 1,
+    steps: [
+      { at: 0, action: 'bass', accent: true }, { at: 1, action: 'strumDown' }, { at: 2, action: 'strumDown' }
+    ]
+  },
+  // rasgueado folclórico: D D U · U D U
+  rasgueado: {
+    id: 'rasgueado', name: 'Rasgueado Folclórico', beatsPerBar: 4, subdivision: 2,
+    steps: [
+      { at: 0, action: 'strumDown', accent: true }, { at: 1, action: 'strumDown' },
+      { at: 2, action: 'strumUp' }, { at: 4, action: 'strumUp' },
+      { at: 5, action: 'strumDown' }, { at: 6, action: 'strumUp' }
+    ]
+  },
+  // arpegio PIMA continuo: arp[0,2,1,2,3,2,1,2]
+  arpegio_pima: {
+    id: 'arpegio_pima', name: 'Arpegio PIMA', beatsPerBar: 4, subdivision: 2,
+    steps: [0, 2, 1, 2, 3, 2, 1, 2].map((arpIndex, at) => ({ at, action: 'arp' as const, arpIndex }))
+  },
+  // drone lento: sostener el acorde (un rasgueo suave por compás) + pedal de tónica
+  drone_lento: {
+    id: 'drone_lento', name: 'Drone Pedal (Ceremonial)', beatsPerBar: 4, subdivision: 1,
+    steps: [{ at: 0, action: 'strumDown' }]
+  }
+};
+
 // Base MIDI pitches for guitar strings (Standard Tuning EADGBE)
 export const STRINGS_BASE_MIDI = [40, 45, 50, 55, 59, 64];
 
@@ -352,6 +404,45 @@ export class BaseAudioEngine {
         this.pluckNote(p.midi, pluckTime, vel * 0.9);
       });
     }
+  }
+
+  // Schedules a voicing across a slot following a rhythm pattern, on the audio
+  // clock for accuracy (REQ-AUD-02/03, §7.2). Returns the slot duration in seconds.
+  scheduleRhythm(voicing: Voicing, pattern: RhythmPattern, bpm: number, durationBeats: number, baseOffsetSec: number = 0): number {
+    this.init();
+    if (!this.ctx) return 0;
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+
+    const secPerBeat = 60 / bpm;
+    const secPerSub = secPerBeat / pattern.subdivision;
+    const totalSubs = pattern.beatsPerBar * pattern.subdivision;
+    const slotSubs = Math.max(1, Math.round(durationBeats * pattern.subdivision));
+    const startTime = this.ctx.currentTime + 0.03 + baseOffsetSec;
+
+    // Active strings ordered low -> high (for bass/arp indexing)
+    const active = voicing.frets
+      .map((f, i) => (f !== -1 ? { midi: STRINGS_BASE_MIDI[i] + f, idx: i } : null))
+      .filter((x): x is { midi: number; idx: number } => x !== null)
+      .sort((a, b) => a.idx - b.idx);
+    if (active.length === 0) return durationBeats * secPerBeat;
+
+    for (let sub = 0; sub < slotSubs; sub++) {
+      const step = pattern.steps.find(s => s.at === (sub % totalSubs));
+      if (!step || step.action === 'rest') continue;
+      const t = startTime + sub * secPerSub;
+      const vel = step.accent ? 0.95 : 0.78;
+      if (step.action === 'strumDown') {
+        this.scheduleChord(voicing, t, { articulation: 'strum', strumDirection: 'down', velocity: vel });
+      } else if (step.action === 'strumUp') {
+        this.scheduleChord(voicing, t, { articulation: 'strum', strumDirection: 'up', velocity: vel * 0.85 });
+      } else if (step.action === 'bass') {
+        this.pluckNote(active[0].midi, t, vel);
+      } else if (step.action === 'arp') {
+        const n = active[(step.arpIndex ?? 0) % active.length];
+        this.pluckNote(n.midi, t, vel * 0.9);
+      }
+    }
+    return durationBeats * secPerBeat;
   }
 
   // Supports a deep, warm drone pedal note below the progression (REQ-AUD-04)
