@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/GabFrank/caninde-chords/compare/v2.0.1...v2.0.2) (2026-06-07)
+
+
+### Bug Fixes
+
+* aplicar actualizaciones de la PWA automáticamente y marcar prueba de deploy ([65e8549](https://github.com/GabFrank/caninde-chords/commit/65e8549926929f5196fa39d54c3341a1db8f2c56))
+
 ## [2.0.1](https://github.com/GabFrank/caninde-chords/compare/v2.0.0...v2.0.1) (2026-06-07)
 
 
