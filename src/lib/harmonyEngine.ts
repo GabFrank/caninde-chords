@@ -465,6 +465,18 @@ export function getCandidates(tool: Tool, cur: Chord, key: { tonic: PitchClass; 
     case 'modalColor':
       raw = getModalColorCandidates(key.tonic);
       break;
+    case 'cadence': {
+      // Cadencias: grados de resolución (V, IV, I, vii°) de la tonalidad.
+      const ladder = getDiatonicLadder(key.tonic, key.mode);
+      raw = [ladder[4], ladder[3], ladder[0], ladder[6]]
+        .filter(Boolean)
+        .map(item => {
+          const c = annotate(cur, item.chord, 'cadence');
+          c.role = `${item.roman} (${item.function})`;
+          return c;
+        });
+      break;
+    }
     default: {
       // Cadence & Free fallback: return a mixture of diatonic and mediants
       const diatonic = getDiatonicCandidates(cur, key);

@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Square, Plus, Trash2, Copy, Sparkles, AlertCircle, Compass, HelpCircle, ArrowUpRight, ArrowDownRight, RefreshCw, Save, FileSpreadsheet, Eye, Music, Edit2, Volume2, ArrowLeft, ArrowRight, ChevronDown, Check } from 'lucide-react';
-import { PitchClass, Quality, Chord, Tool, Slot, Composition, getCandidates, computePhase, analyzeGesture, getChordString, getPitchClassName, getDefaultAstralFor, getDefaultEmotionFor, parseChordString, SongExportAdapter, mod12, parsePitchClass } from '../lib/harmonyEngine';
+import { PitchClass, Quality, Chord, Tool, Slot, Composition, getCandidates, computePhase, analyzeGesture, getChordString, getPitchClassName, getDefaultAstralFor, getDiatonicLadder, parseChordString, SongExportAdapter, mod12, parsePitchClass } from '../lib/harmonyEngine';
 import { audioEngine, getVoicingForChord, RHYTHM_PATTERNS } from '../services/audioEngine';
 import { db, auth } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot } from 'firebase/firestore';
@@ -47,6 +47,7 @@ const TOOLS_INFO: ToolInfo[] = [
   { id: 'diminishedBridge', name: 'Puente Disminuido', desc: 'Tensión cromática pasajera para resolver con fuerza.', emotions: ['tension', 'suspenso'], astralRange: '3' },
   { id: 'chromaticMediant', name: 'Mediantes Cromáticas', desc: 'Movimientos a terceras que cambian el color de golpe.', emotions: ['asombro', 'profundidad', 'nostalgia'], astralRange: '3' },
   { id: 'modalColor', name: 'Color Modal', desc: 'Notas flotantes y drones vamps para un viaje místico.', emotions: ['hipnotico', 'aire'], astralRange: '0-1' },
+  { id: 'cadence', name: 'Cadencia', desc: 'Resoluciones clásicas (V, IV) que cierran o afianzan la tonalidad.', emotions: ['luminoso', 'serenidad'], astralRange: '1-2' },
   { id: 'free', name: 'Libre (Cualquiera)', desc: 'Exploración abierta sin reglas asignadas.', emotions: ['libre'], astralRange: '0-4' }
 ];
 
@@ -76,6 +77,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
 
   const playTimerRef = useRef<number | null>(null);
   const playIdxRef = useRef<number>(0);
+  const saveTimerRef = useRef<number | null>(null);
 
   // Synced User ID
   const userId = auth.currentUser?.uid || 'anonymous';
@@ -202,8 +204,10 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
   const updateCurrentComp = (updates: Partial<Composition>) => {
     if (!currentComp) return;
     const updated = { ...currentComp, ...updates };
-    setCompositions(prev => prev.map(c => c.id === currentComp.id ? { ...c, ...updates } : c));
-    handleSaveComposition(updated);
+    setCompositions(prev => prev.map(c => c.id === currentComp.id ? updated : c));
+    // REQ-NFR-02: debounce de escrituras a Firestore (evita un write por pulsación)
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => handleSaveComposition(updated), 600);
   };
 
   // 10. Compute phase and coverage indicators
@@ -211,28 +215,11 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
 
   // Wizard flow: ADD chord
   const openAddChordFlow = () => {
-    if (currentComp && currentComp.slots.length === 0) {
-      // First chord is freely chosen from Diatonic ladder as defaults
-      const firstChord: Chord = { root: currentComp.key.tonic, quality: currentComp.key.mode === 'minor' ? 'minor' : 'major' };
-      const newSlot: Slot = {
-        id: 'slot_' + Date.now(),
-        chord: firstChord,
-        durationBeats: 4,
-        toolUsed: 'free',
-        gesture: 'Punto de partida',
-        emotion: 'libre',
-        astralLevel: getDefaultAstralFor(firstChord.quality), // REQ-DAT-02: astral por calidad
-        voicing: getVoicingForChord(firstChord)
-      };
-      updateCurrentComp({ slots: [newSlot] });
-      // Play note
-      audioEngine.init();
-      audioEngine.pluckNote(40 + firstChord.root, 0, 0.9);
-    } else {
-      setSelectedTool('diatonic');
-      setWizardStep(1);
-      setIsWizardOpen(true);
-    }
+    if (!currentComp) return;
+    // REQ-CMP-02: el primer acorde se elige libremente desde la escalera del tono.
+    setSelectedTool('diatonic');
+    setWizardStep(currentComp.slots.length === 0 ? 2 : 1);
+    setIsWizardOpen(true);
   };
 
   const handleSelectTool = (tool: Tool) => {
@@ -242,7 +229,15 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
 
   // Fetch candidate options corresponding to selected tool & current tail chord
   const getWizardCandidates = () => {
-    if (!currentComp || currentComp.slots.length === 0) return [];
+    if (!currentComp) return [];
+    if (currentComp.slots.length === 0) {
+      // Primer acorde: ofrecer la escalera diatónica del tono (REQ-CMP-02)
+      return getDiatonicLadder(currentComp.key.tonic, currentComp.key.mode).map(item => ({
+        chord: item.chord, tool: 'free' as Tool, gesture: 'Punto de partida',
+        emotion: 'libre', astralLevel: getDefaultAstralFor(item.chord.quality),
+        direction: 'steady' as const, rationale: `Grado ${item.roman}`, role: item.roman
+      }));
+    }
     const lastSlot = currentComp.slots[currentComp.slots.length - 1];
     return getCandidates(selectedTool, lastSlot.chord, currentComp.key);
   };
@@ -324,19 +319,17 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
   const recalculateAllSlotsGestures = (slotsList: Slot[]) => {
     if (!currentComp) return;
     let prev: Chord | null = null;
+    // Devuelve slots nuevos (sin mutar el estado existente).
     const recalculated = slotsList.map((slot, i) => {
+      let out: Slot;
       if (i === 0) {
-        slot.gesture = 'Punto de partida';
-        slot.emotion = 'libre';
-        slot.astralLevel = 1;
-      } else if (prev) {
-        const gestureResult = analyzeGesture(prev, slot.chord, currentComp.key);
-        slot.gesture = gestureResult.gesture;
-        slot.emotion = gestureResult.emotion;
-        slot.astralLevel = gestureResult.astral;
+        out = { ...slot, gesture: 'Punto de partida', emotion: 'libre', astralLevel: getDefaultAstralFor(slot.chord.quality) };
+      } else {
+        const g = analyzeGesture(prev as Chord, slot.chord, currentComp.key);
+        out = { ...slot, gesture: g.gesture, emotion: g.emotion, astralLevel: g.astral };
       }
       prev = slot.chord;
-      return slot;
+      return out;
     });
 
     updateCurrentComp({ slots: recalculated });
@@ -522,6 +515,20 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
               />
               <span className="text-[10px] font-bold text-zinc-400 font-mono pr-2">BPM</span>
             </div>
+
+            {/* Time signature (compás) */}
+            <select
+              value={currentComp.tempo.timeSignature.join('/')}
+              onChange={(e) => {
+                const [n, d] = e.target.value.split('/').map(Number);
+                updateCurrentComp({ tempo: { ...currentComp.tempo, timeSignature: [n, d] } });
+              }}
+              className="py-1.5 px-3 rounded-xl border-none outline-none text-xs font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+            >
+              {['4/4', '3/4', '6/8', '2/4'].map(ts => (
+                <option key={ts} value={ts}>Compás {ts}</option>
+              ))}
+            </select>
 
             {/* Articulation */}
             <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl">
@@ -765,13 +772,17 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
               {/* Header */}
               <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-2">
-                  {wizardStep === 2 && (
+                  {wizardStep === 2 && currentComp && currentComp.slots.length > 0 && (
                     <button onClick={() => setWizardStep(1)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full">
                       <ArrowLeft size={16} />
                     </button>
                   )}
                   <h3 className="text-lg font-black font-sans">
-                    {wizardStep === 1 ? 'Paso 1: ¿Qué herramienta armónica usar?' : 'Paso 2: Elige tu próximo acorde'}
+                    {wizardStep === 1
+                      ? 'Paso 1: ¿Qué herramienta armónica usar?'
+                      : (currentComp && currentComp.slots.length === 0
+                        ? 'Elige el primer acorde (escalera del tono)'
+                        : 'Paso 2: Elige tu próximo acorde')}
                   </h3>
                 </div>
                 <button
