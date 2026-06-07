@@ -45,7 +45,8 @@ const Modal: React.FC<{
   );
 };
 
-const APP_VERSION = '1.1.9';
+declare const __APP_VERSION__: string;
+const APP_VERSION = __APP_VERSION__;
 
 export default function App() {
   const { user, profile, loading, isAuthReady, updateProfile } = useAuth();
