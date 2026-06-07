@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "Song": {
+      "title": "Song",
+      "description": "A song with lyrics and chords",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Song title" },
+        "artist": { "type": "string", "description": "Artist name" },
+        "content": { "type": "string", "description": "Lyrics with chords in [Chord] format" },
+        "ownerId": { "type": "string", "description": "UID of the owner" },
+        "collaborators": { "type": "array", "items": { "type": "string" }, "description": "List of collaborator emails" },
+        "originalId": { "type": "string", "description": "ID of the source resource if shared" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "ownerId"]
+    },
+    "Setlist": {
+      "title": "Setlist",
+      "description": "A collection of songs",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Setlist name" },
+        "ownerId": { "type": "string", "description": "UID of the owner" },
+        "songIds": { "type": "array", "items": { "type": "string" }, "description": "Ordered list of song IDs" },
+        "collaborators": { "type": "array", "items": { "type": "string" }, "description": "List of collaborator emails" },
+        "originalId": { "type": "string", "description": "ID of the source resource if shared" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "ownerId", "songIds"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] }
+      },
+      "required": ["displayName", "email"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "A live session for a setlist",
+      "type": "object",
+      "properties": {
+        "setlistId": { "type": "string" },
+        "directorId": { "type": "string" },
+        "directorName": { "type": "string" },
+        "currentSongIndex": { "type": "number" },
+        "currentSongId": { "type": "string" },
+        "active": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["setlistId", "directorId", "directorName", "currentSongIndex", "active"]
+    },
+    "UserSongSettings": {
+      "title": "UserSongSettings",
+      "description": "User-specific settings for a song",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "songId": { "type": "string" },
+        "fontSize": { "type": "number" },
+        "columns": { "type": "number" },
+        "transpose": { "type": "number" },
+        "autoResize": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "songId"]
+    },
+    "Share": {
+      "title": "Share",
+      "description": "An invitation to share a song or setlist",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["songs", "setlists"] },
+        "resourceId": { "type": "string" },
+        "title": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderEmail": { "type": "string" },
+        "senderName": { "type": "string" },
+        "recipientEmail": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "resourceData": { "type": "object" },
+        "songsData": { "type": "array", "items": { "type": "object" } }
+      },
+      "required": ["type", "resourceId", "title", "senderId", "senderEmail", "recipientEmail", "status", "createdAt"]
+    },
+    "Contact": {
+      "title": "Contact",
+      "description": "A contact for sharing",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "lastInteraction": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "email", "lastInteraction"]
+    }
+  },
+  "firestore": {
+    "/songs/{songId}": {
+      "schema": "Song",
+      "description": "Individual songs"
+    },
+    "/setlists/{setlistId}": {
+      "schema": "Setlist",
+      "description": "Setlists created by users"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "Live director sessions"
+    },
+    "/userSongSettings/{settingId}": {
+      "schema": "UserSongSettings",
+      "description": "User-specific settings for a song"
+    },
+    "/shares/{shareId}": {
+      "schema": "Share",
+      "description": "Invitations to share resources"
+    },
+    "/contacts/{contactId}": {
+      "schema": "Contact",
+      "description": "User contacts"
+    }
+  }
+}

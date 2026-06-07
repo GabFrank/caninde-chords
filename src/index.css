@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+    overscroll-behavior-y: contain;
+  }
+  input, textarea {
+    user-select: text;
+  }
+}
+
+:fullscreen {
+  background-color: black;
+}
+
+:fullscreen .h-full {
+  height: 100vh !important;
+}
+
+@layer utilities {
+  .h-dvh {
+    height: 100dvh;
+  }
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+  .touch-scrolling {
+    -webkit-overflow-scrolling: touch;
+  }
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-area-padding {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}

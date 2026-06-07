@@ -1,0 +1,274 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (UID)
+    // Fields:
+    //   - displayName: string (required)
+    //   - email: string (required)
+    //   - photoURL: string (optional)
+    //   - role: string (required, 'user' or 'admin')
+    //
+    // Collection: songs
+    // Document ID: songId
+    // Fields:
+    //   - title: string (required, < 100 chars)
+    //   - artist: string (optional, < 100 chars)
+    //   - content: string (required, < 10000 chars)
+    //   - ownerId: string (required, immutable)
+    //   - collaborators: list of strings (optional, emails)
+    //   - editors: list of strings (optional, emails)
+    //   - createdAt: timestamp (required, immutable)
+    //   - updatedAt: timestamp (required)
+    //
+    // Collection: setlists
+    // Document ID: setlistId
+    // Fields:
+    //   - name: string (required, < 100 chars)
+    //   - ownerId: string (required, immutable)
+    //   - songIds: list of strings (required, < 100 items)
+    //   - collaborators: list of strings (optional, emails)
+    //   - editors: list of strings (optional, emails)
+    //   - createdAt: timestamp (required, immutable)
+    //
+    // Collection: sessions
+    // Document ID: sessionId
+    // Fields:
+    //   - setlistId: string (required)
+    //   - directorId: string (required, immutable)
+    //   - directorName: string (required)
+    //   - currentSongIndex: number (required)
+    //   - active: boolean (required)
+    //   - updatedAt: timestamp (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "bellas.rosas.sdg@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isDocOwner(data) {
+      return isAuthenticated() && request.auth.uid == data.ownerId;
+    }
+
+    function isCollaborator(data) {
+      return isAuthenticated() && 
+             (
+               ('collaborators' in data && (request.auth.token.email in data.collaborators || request.auth.uid in data.collaborators)) ||
+               ('editors' in data && (request.auth.token.email in data.editors || request.auth.uid in data.editors))
+             );
+    }
+
+    function isEditor(data) {
+      return isAuthenticated() && 
+             (
+               isDocOwner(data) || 
+               ('editors' in data && (request.auth.token.email in data.editors || request.auth.uid in data.editors)) ||
+               isAdmin()
+             );
+    }
+
+    function isJoining(newData, oldData) {
+      // Allow adding self to collaborators if authenticated
+      let oldCollabs = ('collaborators' in oldData) ? oldData.collaborators : [];
+      let oldEditors = ('editors' in oldData) ? oldData.editors : [];
+      let userIdent = request.auth.token.email;
+      
+      return isAuthenticated() &&
+             newData.diff(oldData).affectedKeys().hasAny(['collaborators', 'editors']) &&
+             newData.collaborators.hasAll(oldCollabs) &&
+             newData.editors.hasAll(oldEditors) &&
+             (
+               (userIdent in newData.collaborators && !(userIdent in oldCollabs)) ||
+               (userIdent in newData.editors && !(userIdent in oldEditors))
+             );
+    }
+
+    function hasRequiredFields(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(data, ['displayName', 'email', 'role']) &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             data.email is string && data.email == request.auth.token.email &&
+             data.role in ['user', 'admin'];
+    }
+
+    function isValidSong(data) {
+      return hasRequiredFields(data, ['title', 'content', 'ownerId', 'createdAt', 'updatedAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.content is string && data.content.size() < 10000 &&
+             (!('originalId' in data) || (data.originalId is string && data.originalId.size() < 128));
+    }
+
+    function isValidSetlist(data) {
+      return hasRequiredFields(data, ['name', 'ownerId', 'songIds', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.songIds is list && data.songIds.size() < 100 &&
+             (!('originalId' in data) || (data.originalId is string && data.originalId.size() < 128));
+    }
+
+    function isValidSession(data) {
+      return hasRequiredFields(data, ['setlistId', 'directorId', 'directorName', 'currentSongIndex', 'currentSongId', 'active']) &&
+             data.setlistId is string && data.setlistId.size() < 128 &&
+             data.directorId is string && data.directorId.size() < 128 &&
+             data.directorName is string && data.directorName.size() < 100 &&
+             data.currentSongIndex is number &&
+             data.currentSongId is string && data.currentSongId.size() < 128 &&
+             data.active is bool;
+    }
+
+    function isValidUserSongSettings(data) {
+      return hasRequiredFields(data, ['userId', 'songId', 'fontSize', 'columns', 'transpose', 'autoResize', 'updatedAt']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.songId is string &&
+             data.fontSize is number &&
+             data.columns is number &&
+             data.transpose is number &&
+             data.autoResize is bool;
+    }
+
+    function isValidShare(data) {
+      return hasRequiredFields(data, ['type', 'resourceId', 'title', 'senderId', 'senderEmail', 'recipientEmail', 'status', 'createdAt']) &&
+             data.type in ['songs', 'setlists'] &&
+             data.status in ['pending', 'accepted', 'rejected'] &&
+             data.senderEmail == request.auth.token.email;
+    }
+
+    function isValidContact(data) {
+      return hasRequiredFields(data, ['ownerId', 'email', 'lastInteraction']) &&
+             data.ownerId == request.auth.uid &&
+             data.email is string && data.email.size() > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+    }
+
+    match /userSongSettings/{settingId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidUserSongSettings(request.resource.data);
+      allow update: if isAuthenticated() && 
+                    resource.data.userId == request.auth.uid &&
+                    isValidUserSongSettings(request.resource.data) &&
+                    request.resource.data.userId == resource.data.userId &&
+                    request.resource.data.songId == resource.data.songId;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /songs/{songId} {
+      allow read: if isAuthenticated() && (isCollaborator(resource.data) || isEditor(resource.data));
+      allow create: if isAuthenticated() && isValidSong(request.resource.data) && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+                    (
+                      (isEditor(resource.data) &&
+                       isValidSong(request.resource.data) &&
+                       request.resource.data.ownerId == resource.data.ownerId &&
+                       request.resource.data.createdAt == resource.data.createdAt
+                      ) || 
+                      isJoining(request.resource.data, resource.data) ||
+                      // Allow removing self
+                      (
+                        request.resource.data.diff(resource.data).affectedKeys().hasAny(['collaborators', 'editors']) &&
+                        !(request.auth.token.email in request.resource.data.get('collaborators', [])) &&
+                        !(request.auth.token.email in request.resource.data.get('editors', []))
+                      )
+                    );
+      allow delete: if isAuthenticated() && (isDocOwner(resource.data) || isAdmin());
+    }
+
+    match /setlists/{setlistId} {
+      allow read: if isAuthenticated() && (isCollaborator(resource.data) || isEditor(resource.data));
+      allow create: if isAuthenticated() && isValidSetlist(request.resource.data) && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+                    (
+                      (isEditor(resource.data) &&
+                       isValidSetlist(request.resource.data) &&
+                       request.resource.data.ownerId == resource.data.ownerId &&
+                       request.resource.data.createdAt == resource.data.createdAt
+                      ) || 
+                      isJoining(request.resource.data, resource.data) ||
+                      // Allow removing self
+                      (
+                        request.resource.data.diff(resource.data).affectedKeys().hasAny(['collaborators', 'editors']) &&
+                        !(request.auth.token.email in request.resource.data.get('collaborators', [])) &&
+                        !(request.auth.token.email in request.resource.data.get('editors', []))
+                      )
+                    );
+      allow delete: if isAuthenticated() && (isDocOwner(resource.data) || isAdmin());
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                    request.resource.data.directorId == request.auth.uid &&
+                    isValidSession(request.resource.data);
+      allow update: if isAuthenticated() && 
+                    resource.data.directorId == request.auth.uid &&
+                    isValidSession(request.resource.data) &&
+                    request.resource.data.directorId == resource.data.directorId;
+      allow delete: if isAuthenticated() && 
+                    (resource.data.directorId == request.auth.uid || isAdmin());
+
+      match /participants/{participantId} {
+        allow read: if isAuthenticated();
+        // Allow any authenticated user to record their presence in the session
+        allow write: if isAuthenticated() && participantId == request.auth.uid;
+      }
+
+      match /signaling/{peerId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    match /shares/{shareId} {
+      allow read: if isAuthenticated() && (resource.data.recipientEmail == request.auth.token.email || resource.data.senderId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidShare(request.resource.data);
+      allow update: if isAuthenticated() && 
+                    (
+                      (resource.data.recipientEmail == request.auth.token.email && request.resource.data.status in ['accepted', 'rejected']) ||
+                      (resource.data.senderId == request.auth.uid && request.resource.data.status == 'rejected')
+                    );
+      allow delete: if isAuthenticated() && (resource.data.recipientEmail == request.auth.token.email || resource.data.senderId == request.auth.uid);
+    }
+
+    match /contacts/{contactId} {
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidContact(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && isValidContact(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+  }
+}
