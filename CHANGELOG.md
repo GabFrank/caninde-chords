@@ -1,3 +1,10 @@
+# [2.7.0](https://github.com/GabFrank/caninde-chords/compare/v2.6.0...v2.7.0) (2026-06-07)
+
+
+### Features
+
+* **audio:** timbre de guitarra más cálido y natural ([12f939d](https://github.com/GabFrank/caninde-chords/commit/12f939d3342e20fa71831eff4739f1d556ddb082))
+
 # [2.6.0](https://github.com/GabFrank/caninde-chords/compare/v2.5.0...v2.6.0) (2026-06-07)
 
 
