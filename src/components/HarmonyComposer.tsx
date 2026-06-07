@@ -64,6 +64,10 @@ const CHORD_MOOD: Record<string, { es: string; en: string }> = {
   min7b5: { es: 'inquietante, a la deriva', en: 'uneasy, adrift' }
 };
 
+// Song sections (parts) for the timeline.
+const SECTION_PRESETS = ['Intro', 'Verso', 'Pre', 'Estribillo', 'Puente', 'Solo', 'Outro'];
+const DEFAULT_SECTION = 'Parte 1';
+
 interface ToolInfo {
   id: Tool;
   name: string;
@@ -120,9 +124,18 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
   const [simpleList, setSimpleList] = useState<any[]>([]);
   const [simpleTitle, setSimpleTitle] = useState('');
   const [freeRoot, setFreeRoot] = useState<number | null>(null);
+  // Sections
+  const [collapsedSecs, setCollapsedSecs] = useState<Set<number>>(new Set());
+  const [sectionMenu, setSectionMenu] = useState<number | null>(null);
+  const [renameSec, setRenameSec] = useState<{ start: number; end: number; value: string } | null>(null);
+  const [addSectionPicker, setAddSectionPicker] = useState(false);
+  const [pendingInsertIdx, setPendingInsertIdx] = useState<number | null>(null);
+  const [pendingSection, setPendingSection] = useState<string | null>(null);
 
   const playTimerRef = useRef<number | null>(null);
   const playIdxRef = useRef<number>(0);
+  const playStartRef = useRef<number>(0);
+  const playEndRef = useRef<number>(0);
   const saveTimerRef = useRef<number | null>(null);
 
   // Synced User ID
@@ -301,6 +314,85 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
     setSimpleStep('freeQualities');
   };
 
+  // ----- Sections -----
+  const sectionRuns: { name: string; start: number; end: number }[] = [];
+  if (currentComp) {
+    currentComp.slots.forEach((s, i) => {
+      const name = s.section || DEFAULT_SECTION;
+      const last = sectionRuns[sectionRuns.length - 1];
+      if (last && last.name === name) last.end = i;
+      else sectionRuns.push({ name, start: i, end: i });
+    });
+  }
+
+  const openAddToSection = (run: { name: string; end: number }) => {
+    setPendingSection(run.name);
+    setPendingInsertIdx(run.end + 1);
+    setSelectedTool('diatonic');
+    setWizardStep(1);
+    setSimpleStep('choose');
+    setFreeRoot(null);
+    setIsWizardOpen(true);
+  };
+
+  const chooseNewSection = (name: string) => {
+    setAddSectionPicker(false);
+    setPendingSection(name);
+    setPendingInsertIdx(null);
+    setSelectedTool('diatonic');
+    setWizardStep(currentComp && currentComp.slots.length === 0 ? 2 : 1);
+    setSimpleStep('choose');
+    setFreeRoot(null);
+    setIsWizardOpen(true);
+  };
+
+  const duplicateSectionRun = (run: { start: number; end: number }) => {
+    if (!currentComp) return;
+    const block = currentComp.slots.slice(run.start, run.end + 1).map((s, k) => ({ ...s, id: 'dup_' + Date.now() + '_' + k }));
+    const arr = [...currentComp.slots];
+    arr.splice(run.end + 1, 0, ...block);
+    recalculateAllSlotsGestures(arr);
+    setSectionMenu(null);
+  };
+
+  const deleteSectionRun = (run: { start: number; end: number }) => {
+    if (!currentComp) return;
+    const arr = currentComp.slots.filter((_, i) => i < run.start || i > run.end);
+    recalculateAllSlotsGestures(arr);
+    setSectionMenu(null);
+  };
+
+  const moveSectionRun = (runIndex: number, dir: 'up' | 'down') => {
+    if (!currentComp) return;
+    const target = runIndex + (dir === 'up' ? -1 : 1);
+    if (target < 0 || target >= sectionRuns.length) return;
+    const a = sectionRuns[Math.min(runIndex, target)];
+    const b = sectionRuns[Math.max(runIndex, target)];
+    const before = currentComp.slots.slice(0, a.start);
+    const blockA = currentComp.slots.slice(a.start, a.end + 1);
+    const between = currentComp.slots.slice(a.end + 1, b.start);
+    const blockB = currentComp.slots.slice(b.start, b.end + 1);
+    const after = currentComp.slots.slice(b.end + 1);
+    recalculateAllSlotsGestures([...before, ...blockB, ...between, ...blockA, ...after]);
+    setSectionMenu(null);
+  };
+
+  const applyRenameSection = () => {
+    if (!currentComp || !renameSec) return;
+    const name = renameSec.value.trim() || DEFAULT_SECTION;
+    const arr = currentComp.slots.map((s, i) => (i >= renameSec.start && i <= renameSec.end ? { ...s, section: name } : s));
+    updateCurrentComp({ slots: arr });
+    setRenameSec(null);
+  };
+
+  const toggleCollapse = (start: number) => {
+    setCollapsedSecs(prev => {
+      const next = new Set(prev);
+      if (next.has(start)) next.delete(start); else next.add(start);
+      return next;
+    });
+  };
+
   // Reusable candidate card (used by advanced step 2 and the simple lists).
   const renderCandidate = (cand: any, idx: number) => {
     const emo = EMOTIONS[cand.emotion] || { name: 'Libre', color: 'bg-zinc-600', emoji: '⭐' };
@@ -367,19 +459,29 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
   // Append slot dynamically on candidate pick
   const handleSelectCandidate = (cand: any) => {
     if (!currentComp) return;
+    const slots = currentComp.slots;
+    const sectionLabel = pendingSection ?? (slots.length > 0 ? (slots[slots.length - 1].section || DEFAULT_SECTION) : DEFAULT_SECTION);
     const newSlot: Slot = {
-      id: 'slot_' + Date.now() + '_' + currentComp.slots.length,
+      id: 'slot_' + Date.now() + '_' + slots.length,
       chord: cand.chord,
       durationBeats: 4,
       toolUsed: cand.tool,
       gesture: cand.gesture,
       emotion: cand.emotion,
       astralLevel: cand.astralLevel,
-      voicing: getVoicingForChord(cand.chord)
+      voicing: getVoicingForChord(cand.chord),
+      section: sectionLabel
     };
 
-    const nextSlots = [...currentComp.slots, newSlot];
-    updateCurrentComp({ slots: nextSlots });
+    if (pendingInsertIdx !== null) {
+      const arr = [...slots];
+      arr.splice(pendingInsertIdx, 0, newSlot);
+      recalculateAllSlotsGestures(arr);
+    } else {
+      updateCurrentComp({ slots: [...slots, newSlot] });
+    }
+    setPendingInsertIdx(null);
+    setPendingSection(null);
     setIsWizardOpen(false);
 
     // Play physical transition swipe
@@ -477,33 +579,29 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
     setEditSlotIdx(null);
   };
 
-  // Timeline playback scheduler (REQ-CMP-07)
-  const handlePlayComposition = () => {
+  // Timeline playback scheduler (REQ-CMP-07). Plays slots [start, end).
+  const startPlayback = (start = 0, end?: number) => {
     if (!currentComp || currentComp.slots.length === 0) return;
     audioEngine.init();
     audioEngine.stopAll();
+    if (playTimerRef.current) clearTimeout(playTimerRef.current);
 
-    if (isPlaying) {
-      handleStopComposition();
-      return;
-    }
-
+    const stop = end ?? currentComp.slots.length;
     setIsPlaying(true);
     isLoopingRef.current = isLooping;
-    playIdxRef.current = 0;
-    setActivePlaySlotIdx(0);
-    
-    // Beat timings calculations
-    const bpm = currentComp.tempo.bpm;
-    const msPerBeat = (60 / bpm) * 1000;
+    playStartRef.current = start;
+    playEndRef.current = stop;
+    playIdxRef.current = start;
+    setActivePlaySlotIdx(start);
+
+    const msPerBeat = (60 / currentComp.tempo.bpm) * 1000;
 
     const playNext = () => {
       let idx = playIdxRef.current;
-      if (!currentComp || idx >= currentComp.slots.length) {
-        if (isLoopingRef.current && currentComp && currentComp.slots.length > 0) {
-          // REQ-CMP-07: loop opcional
-          idx = 0;
-          playIdxRef.current = 0;
+      if (!currentComp || idx >= playEndRef.current) {
+        if (isLoopingRef.current) {
+          idx = playStartRef.current;
+          playIdxRef.current = idx;
         } else {
           handleStopComposition();
           return;
@@ -511,6 +609,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
       }
 
       const slot = currentComp.slots[idx];
+      if (!slot) { handleStopComposition(); return; }
       setActivePlaySlotIdx(idx);
 
       // Trigger the slot with its rhythm pattern (Apéndice B)
@@ -520,20 +619,23 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
       const pattern = RHYTHM_PATTERNS[patId] || RHYTHM_PATTERNS['balada'];
       audioEngine.scheduleRhythm(voicing, pattern, currentComp.tempo.bpm, slot.durationBeats);
 
-      // Drone pedal on the tonic for the ceremonial pattern (REQ-AUD-04)
       if (currentComp.rhythmPatternId === 'drone_lento') {
-        audioEngine.triggerDrone(40 + currentComp.key.tonic, true); // root pedal
+        audioEngine.triggerDrone(40 + currentComp.key.tonic, true);
       }
 
-      // Progress index
       playIdxRef.current = idx + 1;
-      const durationMs = slot.durationBeats * msPerBeat;
-      
-      playTimerRef.current = window.setTimeout(playNext, durationMs);
+      playTimerRef.current = window.setTimeout(playNext, slot.durationBeats * msPerBeat);
     };
 
     playNext();
   };
+
+  const handlePlayComposition = () => {
+    if (isPlaying) { handleStopComposition(); return; }
+    startPlayback(0);
+  };
+  const playFromIndex = (idx: number) => { handleStopComposition(); startPlayback(idx); };
+  const playSection = (start: number, end: number) => { handleStopComposition(); startPlayback(start, end); };
 
   const handleStopComposition = () => {
     setIsPlaying(false);
@@ -696,11 +798,11 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
           </div>
 
           {/* Timeline Row */}
-          <div className="relative border border-dashed border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl min-h-[160px] flex items-center w-full overflow-x-auto select-none custom-scrollbar">
+          <div className="border border-dashed border-zinc-200 dark:border-zinc-800 p-4 rounded-3xl min-h-[140px] w-full select-none space-y-3">
             {currentComp.slots.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-center w-full space-y-3">
+              <div className="flex flex-col items-center justify-center text-center w-full space-y-3 py-8">
                 <Compass className="text-zinc-300 dark:text-zinc-700 w-12 h-12 animate-bounce" />
-                <p className="text-xs text-zinc-400 font-medium">{tr('No hay acordes en la línea de tiempo. Comienza tocando el botón de abajo.', 'No chords in the timeline yet. Start by tapping the button below.')}</p>
+                <p className="text-xs text-zinc-400 font-medium">{tr('No hay acordes todavía. Comienza tocando el botón de abajo.', 'No chords yet. Start by tapping the button below.')}</p>
                 <button
                   onClick={openAddChordFlow}
                   className="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-500/10"
@@ -709,78 +811,66 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-4 flex-nowrap pr-24">
-                {currentComp.slots.map((slot, i) => {
-                  const emo = EMOTIONS[slot.emotion || 'libre'] || { name: 'Libre', color: 'from-zinc-500 to-zinc-600 text-zinc-950', emoji: '⭐' };
-                  
+              <>
+                {sectionRuns.map((run, runIdx) => {
+                  const collapsed = collapsedSecs.has(run.start);
                   return (
-                    <div key={slot.id} className="flex items-center gap-2 shrink-0">
-                      <motion.button
-                        type="button"
-                        onClick={() => setMenuSlotIdx(i)}
-                        className={`w-36 h-48 rounded-2xl border flex flex-col justify-between p-4 text-left transition-all relative ${activePlaySlotIdx === i ? 'border-blue-500 ring-4 ring-blue-500/20 scale-105 shadow-xl' : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:border-blue-400'}`}
-                      >
-                        {/* Options affordance */}
-                        <span className="absolute top-2 right-2 text-zinc-300 dark:text-zinc-600">
-                          <MoreVertical size={16} />
-                        </span>
-
-                        {/* Chord representation info */}
-                        <div className="flex justify-between items-start pr-5">
-                          <div>
-                            <span className="text-xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">
-                              {getChordString(slot.chord)}
-                            </span>
-                            <div className="text-[9px] text-zinc-400 font-mono tracking-tighter mt-0.5">
-                              {slot.gesture || tr('Paso', 'Step')}
-                            </div>
-                          </div>
-                          <span className="text-lg">{emo.emoji}</span>
+                    <div key={run.start} className="rounded-2xl bg-zinc-50/60 dark:bg-zinc-900/40 border border-zinc-200/60 dark:border-zinc-800/60 p-3">
+                      {/* Section header */}
+                      <div className="flex items-center justify-between mb-2 gap-2">
+                        <button onClick={() => toggleCollapse(run.start)} className="flex items-center gap-1.5 min-w-0">
+                          <ChevronDown size={14} className={`transition-transform shrink-0 text-zinc-400 ${collapsed ? '-rotate-90' : ''}`} />
+                          <span className="text-xs font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-300 truncate">{run.name}</span>
+                          <span className="text-[9px] text-zinc-400 font-mono shrink-0">({run.end - run.start + 1})</span>
+                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => playSection(run.start, run.end + 1)} title={tr('Reproducir sección', 'Play section')} className="p-1.5 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500"><Play size={13} /></button>
+                          <button onClick={() => setSectionMenu(runIdx)} title={tr('Opciones de sección', 'Section options')} className="p-1.5 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500"><MoreVertical size={14} /></button>
                         </div>
+                      </div>
 
-                        {/* Middle Lyric Label */}
-                        <div className="my-1 text-center min-h-[14px]">
-                          {slot.lyric ? (
-                            <p className="text-[10px] italic text-zinc-600 dark:text-zinc-300 truncate font-sans">
-                              "{slot.lyric}"
-                            </p>
-                          ) : (
-                            <span className="text-[9px] text-zinc-300 dark:text-zinc-600">
-                              {tr('toca para opciones', 'tap for options')}
-                            </span>
-                          )}
+                      {/* Chips (wrap) */}
+                      {!collapsed && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {currentComp.slots.slice(run.start, run.end + 1).map((slot, k) => {
+                            const i = run.start + k;
+                            const emo = EMOTIONS[slot.emotion || 'libre'] || { emoji: '⭐' };
+                            const active = activePlaySlotIdx === i;
+                            return (
+                              <button
+                                key={slot.id}
+                                onClick={() => setMenuSlotIdx(i)}
+                                title={slot.gesture || ''}
+                                className={`relative flex flex-col items-center justify-center w-[64px] h-[58px] rounded-xl border transition-all ${active ? 'border-blue-500 ring-2 ring-blue-500/30 bg-blue-50 dark:bg-blue-900/20' : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-blue-400'}`}
+                              >
+                                <span className="text-sm font-black font-mono text-zinc-900 dark:text-white leading-none">{getChordString(slot.chord)}</span>
+                                <span className="text-[13px] leading-none mt-1">{emo.emoji}</span>
+                                <span className="absolute bottom-0.5 right-1 text-[8px] font-mono text-zinc-400">✨{slot.astralLevel}</span>
+                                {slot.lyric && <span className="absolute bottom-0.5 left-1 text-[8px] text-blue-400">♪</span>}
+                              </button>
+                            );
+                          })}
+                          <button
+                            onClick={() => openAddToSection(run)}
+                            title={tr('Agregar acorde aquí', 'Add chord here')}
+                            className="w-[64px] h-[58px] rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-400 hover:border-blue-500 hover:text-blue-500 transition-all"
+                          >
+                            <Plus size={16} />
+                          </button>
                         </div>
-
-                        {/* Footer stats: duration and astral lvl */}
-                        <div className="border-t border-zinc-100 dark:border-zinc-800 pt-2 flex justify-between items-center bg-transparent">
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
-                            {slot.durationBeats} beats
-                          </span>
-                          <span className="text-[10px] font-bold font-mono text-zinc-500" title="Nivel Astral">
-                            ✨ {slot.astralLevel}
-                          </span>
-                        </div>
-                      </motion.button>
-
-                      {/* Direction Connector */}
-                      {i < currentComp.slots.length - 1 && (
-                        <span className="text-zinc-300 dark:text-zinc-700 font-black shrink-0 font-mono text-base tracking-widest px-2">
-                          ➜
-                        </span>
                       )}
                     </div>
                   );
                 })}
 
-                {/* Inline append trigger */}
+                {/* Add new section */}
                 <button
-                  onClick={openAddChordFlow}
-                  className="w-14 h-48 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center hover:border-blue-500 hover:text-blue-500 transition-all text-zinc-400"
-                  title="Agregar Acorde"
+                  onClick={() => setAddSectionPicker(true)}
+                  className="w-full py-2.5 rounded-2xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:border-blue-500 hover:text-blue-500 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
                 >
-                  <Plus size={20} />
+                  <Plus size={14} /> {tr('Nueva sección', 'New section')}
                 </button>
-              </div>
+              </>
             )}
           </div>
 
@@ -1118,6 +1208,10 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                   </button>
                 </div>
 
+                <button onClick={() => { close(); playFromIndex(idx); }} className={itemCls}>
+                  <Play size={16} /> {tr('Reproducir desde aquí', 'Play from here')}
+                </button>
+
                 <button onClick={() => handleCycleDuration(idx)} className={`${itemCls} justify-between`}>
                   <span className="flex items-center gap-2"><Clock size={16} /> {tr('Duración', 'Duration')}</span>
                   <span className="font-mono text-blue-600">{s.durationBeats} beats →</span>
@@ -1138,6 +1232,80 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
             </div>
           );
         })()}
+      </AnimatePresence>
+
+      {/* MODAL: Section options */}
+      <AnimatePresence>
+        {sectionMenu !== null && sectionRuns[sectionMenu] && (() => {
+          const run = sectionRuns[sectionMenu];
+          const runIdx = sectionMenu;
+          const close = () => setSectionMenu(null);
+          const itemCls = 'w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm font-bold text-zinc-700 dark:text-zinc-200 transition-colors';
+          return (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={close}>
+              <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-3xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-2xl space-y-2">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800 mb-1">
+                  <span className="text-sm font-black uppercase tracking-wider text-zinc-700 dark:text-zinc-200">{run.name}</span>
+                  <button onClick={close} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400">✕</button>
+                </div>
+                <button onClick={() => { close(); playSection(run.start, run.end + 1); }} className={itemCls}><Play size={16} /> {tr('Reproducir sección', 'Play section')}</button>
+                <button onClick={() => { setRenameSec({ start: run.start, end: run.end, value: run.name }); close(); }} className={itemCls}><Edit2 size={16} /> {tr('Renombrar', 'Rename')}</button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button disabled={runIdx === 0} onClick={() => moveSectionRun(runIdx, 'up')} className={`${itemCls} justify-center disabled:opacity-30`}><ArrowUpRight size={16} /> {tr('Subir', 'Up')}</button>
+                  <button disabled={runIdx === sectionRuns.length - 1} onClick={() => moveSectionRun(runIdx, 'down')} className={`${itemCls} justify-center disabled:opacity-30`}><ArrowDownRight size={16} /> {tr('Bajar', 'Down')}</button>
+                </div>
+                <button onClick={() => duplicateSectionRun(run)} className={itemCls}><Copy size={16} /> {tr('Duplicar sección', 'Duplicate section')}</button>
+                <button onClick={() => deleteSectionRun(run)} className="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 text-sm font-bold transition-colors"><Trash2 size={16} /> {tr('Eliminar sección', 'Delete section')}</button>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* MODAL: Rename section */}
+      <AnimatePresence>
+        {renameSec !== null && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-3xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-2xl">
+              <h3 className="text-base font-extrabold mb-4">{tr('Renombrar sección', 'Rename section')}</h3>
+              <input
+                type="text"
+                value={renameSec.value}
+                onChange={(e) => setRenameSec({ ...renameSec, value: e.target.value })}
+                className="w-full p-3 border-none bg-zinc-100 dark:bg-zinc-800 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 mb-3 text-sm"
+                placeholder={tr('Nombre de la sección', 'Section name')}
+              />
+              <div className="flex flex-wrap gap-1.5 mb-5">
+                {SECTION_PRESETS.map(p => (
+                  <button key={p} onClick={() => setRenameSec({ ...renameSec, value: p })} className="px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold text-zinc-500 hover:text-blue-600">{p}</button>
+                ))}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setRenameSec(null)} className="px-4 py-2 text-xs font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg">{tr('Cancelar', 'Cancel')}</button>
+                <button onClick={applyRenameSection} className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg">{tr('Guardar', 'Save')}</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: New section picker */}
+      <AnimatePresence>
+        {addSectionPicker && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setAddSectionPicker(false)}>
+            <motion.div initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }} onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-3xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-2xl space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-extrabold">{tr('Nueva sección', 'New section')}</h3>
+                <button onClick={() => setAddSectionPicker(false)} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400">✕</button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {SECTION_PRESETS.map(p => (
+                  <button key={p} onClick={() => chooseNewSection(p)} className="py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 text-xs font-bold text-zinc-600 dark:text-zinc-300 transition-colors">{p}</button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       {/* MODAL: Edit Lyrics */}

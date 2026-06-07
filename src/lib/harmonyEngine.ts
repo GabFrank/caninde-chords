@@ -51,6 +51,7 @@ export interface Slot {
   astralLevel: number; // 0..4
   voicing?: Voicing | null;
   lyric?: string;
+  section?: string; // song part this chord belongs to (Intro, Verso, ...)
 }
 
 export interface Composition {
@@ -683,14 +684,20 @@ export function computePhase(slots: Slot[]): PhaseResult {
 // Bidirectional adapters for Song exporting/importing (Section 12)
 export class SongExportAdapter {
   static toHostSongContent(comp: Composition): string {
-    // Clean chord/lyric body in OpenSong-compatible inline [chord] format.
-    let body = `.Intro\n`;
-    comp.slots.forEach((slot, idx) => {
-      const isLast = idx === comp.slots.length - 1;
+    // Clean chord/lyric body in OpenSong-compatible inline [chord] format,
+    // grouped by song section (.Verso, .Estribillo, ...).
+    let body = '';
+    let curSection: string | null = null;
+    comp.slots.forEach((slot) => {
+      const sec = slot.section || 'Parte 1';
+      if (sec !== curSection) {
+        body += `\n.${sec}\n`;
+        curSection = sec;
+      }
       const chName = getChordString(slot.chord);
       body += `[${chName}]${slot.lyric ? ' ' + slot.lyric : ''} `;
-      if ((idx + 1) % 4 === 0 && !isLast) body += `\n`;
     });
+    body = body.trimStart();
 
     // Harmony metadata in a namespaced, bracket-free (base64) block so it never
     // collides with the [chord] syntax and round-trips without loss (REQ-INT-03/REQ-DAT-01).
@@ -702,7 +709,7 @@ export class SongExportAdapter {
       slots: comp.slots.map(s => ({
         c: { r: s.chord.root, q: s.chord.quality },
         t: s.toolUsed, g: s.gesture, e: s.emotion, a: s.astralLevel,
-        d: s.durationBeats, v: s.voicing ? s.voicing.frets : null, l: s.lyric || ''
+        d: s.durationBeats, v: s.voicing ? s.voicing.frets : null, l: s.lyric || '', sec: s.section || ''
       }))
     };
     return `${body}\n\n#CANINDE_META:${encodeMeta(JSON.stringify(payload))}\n`;
@@ -733,7 +740,8 @@ export class SongExportAdapter {
           astralLevel: item.a,
           durationBeats: item.d || 4,
           voicing: item.v ? { frets: item.v } : null,
-          lyric: item.l
+          lyric: item.l,
+          section: item.sec || undefined
         }));
       } catch (e) {
         console.error('Failed to restore harmony metadata', e);

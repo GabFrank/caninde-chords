@@ -121,8 +121,8 @@ describe('REQ-INT/REQ-DAT: round-trip de Composition sin pérdida', () => {
       tempo: { bpm: 88, timeSignature: [4, 4] },
       defaultArticulation: 'arpeggio', rhythmPatternId: 'vals', instrument: 'guitar',
       slots: [
-        { id: '1', chord: { root: 4, quality: 'minor' }, durationBeats: 4, toolUsed: 'free', emotion: 'melancolico', astralLevel: 1, voicing: { frets: [0, 2, 2, 0, 0, 0] }, lyric: 'hola' },
-        { id: '2', chord: { root: 0, quality: 'aug' }, durationBeats: 8, toolUsed: 'augmentedPortal', emotion: 'ingravidez', astralLevel: 3, voicing: { frets: [-1, 3, 2, 1, 1, 0] } }
+        { id: '1', chord: { root: 4, quality: 'minor' }, durationBeats: 4, toolUsed: 'free', emotion: 'melancolico', astralLevel: 1, voicing: { frets: [0, 2, 2, 0, 0, 0] }, lyric: 'hola', section: 'Intro' },
+        { id: '2', chord: { root: 0, quality: 'aug' }, durationBeats: 8, toolUsed: 'augmentedPortal', emotion: 'ingravidez', astralLevel: 3, voicing: { frets: [-1, 3, 2, 1, 1, 0] }, section: 'Verso' }
       ],
       meta: { createdWith: 'x', specVersion: '1.0', createdAt: '', updatedAt: '' }
     };
@@ -133,5 +133,7 @@ describe('REQ-INT/REQ-DAT: round-trip de Composition sin pérdida', () => {
     expect(back.rhythmPatternId).toBe('vals');
     expect(back.slots[1].chord.quality).toBe('aug');
     expect(back.slots[1].voicing?.frets).toEqual([-1, 3, 2, 1, 1, 0]);
+    expect(back.slots[0].section).toBe('Intro');
+    expect(back.slots[1].section).toBe('Verso');
   });
 });
