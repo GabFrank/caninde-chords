@@ -14,9 +14,10 @@ export type Quality =
   | 'sus4' 
   | 'dom7' 
   | 'maj7' 
-  | 'min7' 
-  | 'add9' 
-  | 'six';
+  | 'min7'
+  | 'add9'
+  | 'six'
+  | 'min7b5';
 
 export interface Chord {
   root: PitchClass;
@@ -82,7 +83,8 @@ export const QUALITIES: Record<Quality, number[]> = {
   maj7: [0, 4, 7, 11],
   min7: [0, 3, 7, 10],
   add9: [0, 2, 4, 7],
-  six: [0, 4, 7, 9]
+  six: [0, 4, 7, 9],
+  min7b5: [0, 3, 6, 10]
 };
 
 // Map qualities to major/minor/etc class
@@ -91,7 +93,7 @@ export function getQualityClass(quality: Quality): 'major' | 'minor' | 'aug' | '
   if (['minor', 'min7'].includes(quality)) return 'minor';
   if (['dom7'].includes(quality)) return 'dom';
   if (['aug'].includes(quality)) return 'aug';
-  if (['dim', 'dim7'].includes(quality)) return 'dim';
+  if (['dim', 'dim7', 'min7b5'].includes(quality)) return 'dim';
   return 'sus'; // sus2, sus4
 }
 
@@ -220,7 +222,9 @@ export const GESTURE_TABLE: Record<string, GestureRule> = {
   // ΔRoot = 1, major (Neapolitan bII)
   '1_major': { id: 'neapolitan_bii', name: 'napolitana (♭II)', emotion: 'suspenso', astral: 3, text: 'Tensión dramática y extrañeza expresiva.' },
   // ΔRoot = 0, sus (same root)
-  '0_sus': { id: 'suspension', name: 'suspensión', emotion: 'aire', astral: 1, text: 'Apertura espacial sin tensión definida.' }
+  '0_sus': { id: 'suspension', name: 'suspensión', emotion: 'aire', astral: 1, text: 'Apertura espacial sin tensión definida.' },
+  // ΔRoot = 3, minor (+3ª menor: mediante cromática ascendente) — sección 6.4
+  '3_minor': { id: 'chromatic_mediant_up_minor', name: 'mediante cromática (+3ª m)', emotion: 'misterio', astral: 3, text: 'Un giro misterioso hacia la sombra.' }
 };
 
 // Return default emotion based on chord quality (Appendix A.4)
@@ -231,7 +235,7 @@ export function getDefaultEmotionFor(quality: Quality): string {
   if (['sus2', 'sus4'].includes(quality)) return 'aire';
   if (quality === 'dom7') return 'empuje';
   if (quality === 'aug') return 'ingravidez';
-  if (['dim', 'dim7'].includes(quality)) return 'tension';
+  if (['dim', 'dim7', 'min7b5'].includes(quality)) return 'tension';
   if (qClass === 'major') return 'luminoso';
   return 'melancolico';
 }
@@ -239,7 +243,7 @@ export function getDefaultEmotionFor(quality: Quality): string {
 // Return default astral level based on chord quality (Appendix A.4)
 export function getDefaultAstralFor(quality: Quality): number {
   if (['sus2', 'sus4'].includes(quality)) return 0;
-  if (['dim', 'dim7', 'aug'].includes(quality)) return 3;
+  if (['dim', 'dim7', 'min7b5', 'aug'].includes(quality)) return 3;
   if (quality === 'dom7') return 2;
   return 1;
 }
@@ -388,9 +392,10 @@ export function getDiatonicCandidates(cur: Chord, key: { tonic: PitchClass; mode
   }
   
   // Neighbors: standard degrees are i-1, i+1, dominant (index 4), subdominant (index 3)
+  // NOTE: the ladder has 7 degrees, so wrap with mod 7 (not mod 12).
   const nIndices = [
-    mod12(i - 1) % 7,
-    mod12(i + 1) % 7,
+    (i - 1 + 7) % 7,
+    (i + 1) % 7,
     4, // Degree V
     3  // Degree IV
   ];
@@ -418,45 +423,65 @@ export function getDiatonicCandidates(cur: Chord, key: { tonic: PitchClass; mode
 
 // 6.6 MODAL DRONES / COLORS
 export function getModalColorCandidates(droneRoot: PitchClass): Candidate[] {
-  // Modal Character Chords (Apéndice A.3)
+  // Modal Character Chords (Apéndice A.3). Low intensity, hypnotic vamps over a drone.
   const modesData = [
-    { mode: 'lydian', chord: { root: droneRoot, quality: 'maj7' as Quality }, label: 'Lydian maj7(#11)' },
-    { mode: 'ionian', chord: { root: droneRoot, quality: 'maj7' as Quality }, label: 'Ionian maj7' },
-    { mode: 'mixolydian', chord: { root: droneRoot, quality: 'dom7' as Quality }, label: 'Mixolydian dom7' },
-    { mode: 'dorian', chord: { root: droneRoot, quality: 'min7' as Quality }, label: 'Dorian min7' },
-    { mode: 'dorian_iv', chord: { root: mod12(droneRoot + 5), quality: 'major' as Quality }, label: 'Dorian IV Mayor' },
-    { mode: 'aeolian_vi', chord: { root: mod12(droneRoot + 8), quality: 'major' as Quality }, label: 'Aeolian ♭VI' },
-    { mode: 'phrygian_bii', chord: { root: mod12(droneRoot + 1), quality: 'major' as Quality }, label: 'Phrygian ♭II' }
+    { mode: 'ionian', chord: { root: droneRoot, quality: 'maj7' as Quality }, label: 'Ionian maj7', emotion: 'luminoso' },
+    { mode: 'lydian', chord: { root: mod12(droneRoot + 6), quality: 'major' as Quality }, label: 'Lydian II (#4)', emotion: 'asombro' },
+    { mode: 'mixolydian', chord: { root: mod12(droneRoot + 10), quality: 'major' as Quality }, label: 'Mixolydian ♭VII', emotion: 'hipnotico' },
+    { mode: 'dorian', chord: { root: droneRoot, quality: 'min7' as Quality }, label: 'Dorian min7', emotion: 'hipnotico' },
+    { mode: 'dorian_iv', chord: { root: mod12(droneRoot + 5), quality: 'major' as Quality }, label: 'Dorian IV Mayor', emotion: 'aire' },
+    { mode: 'aeolian_vi', chord: { root: mod12(droneRoot + 8), quality: 'major' as Quality }, label: 'Aeolian ♭VI', emotion: 'melancolico' },
+    { mode: 'phrygian_bii', chord: { root: mod12(droneRoot + 1), quality: 'major' as Quality }, label: 'Phrygian ♭II', emotion: 'tension' },
+    { mode: 'locrian', chord: { root: droneRoot, quality: 'min7b5' as Quality }, label: 'Locrian min7♭5', emotion: 'suspenso' }
   ];
-  
+
   return modesData.map(m => {
     const cand = annotate({ root: droneRoot, quality: 'major' }, m.chord, 'modalColor');
     cand.role = m.label;
-    cand.astralLevel = 1; // Mark as low intensity (astral 0-1) for hypnotics
+    cand.emotion = m.emotion; // hypnotic/modal colors carry their characteristic emotion
+    cand.astralLevel = 1; // Low intensity (astral 0-1) for hypnotic vamps
     return cand;
   });
 }
 
 // Global query dispatcher
 export function getCandidates(tool: Tool, cur: Chord, key: { tonic: PitchClass; mode: 'major' | 'minor' }): Candidate[] {
+  let raw: Candidate[];
   switch (tool) {
     case 'augmentedPortal':
-      return getAugmentedPortalCandidates(cur).candidates;
-    case 'diminishedBridge':
+      raw = getAugmentedPortalCandidates(cur).candidates;
+      break;
+    case 'diminishedBridge': {
       const bridge = getDiminishedBridgeCandidates(cur);
-      return [...bridge.resolutions, bridge.passingTarget];
+      raw = [...bridge.resolutions, bridge.passingTarget];
+      break;
+    }
     case 'chromaticMediant':
-      return getChromaticMediantCandidates(cur);
+      raw = getChromaticMediantCandidates(cur);
+      break;
     case 'diatonic':
-      return getDiatonicCandidates(cur, key);
+      raw = getDiatonicCandidates(cur, key);
+      break;
     case 'modalColor':
-      return getModalColorCandidates(key.tonic);
-    default:
+      raw = getModalColorCandidates(key.tonic);
+      break;
+    default: {
       // Cadence & Free fallback: return a mixture of diatonic and mediants
       const diatonic = getDiatonicCandidates(cur, key);
       const chroms = getChromaticMediantCandidates(cur);
-      return [...diatonic, ...chroms.slice(0, 2)];
+      raw = [...diatonic, ...chroms.slice(0, 2)];
+    }
   }
+
+  // REQ-HRM-03: never return the current chord nor duplicates.
+  const seen = new Set<string>();
+  return raw.filter(c => {
+    if (c.chord.root === cur.root && c.chord.quality === cur.quality) return false;
+    const k = `${c.chord.root}_${c.chord.quality}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 // Inverse function: given a list of transitions, analyze a full sequence
@@ -775,6 +800,7 @@ export function getChordString(chord: Chord, notation: 'scientific' | 'solfege' 
     case 'min7': suffix = 'm7'; break;
     case 'add9': suffix = 'add9'; break;
     case 'six': suffix = '6'; break;
+    case 'min7b5': suffix = 'm7b5'; break;
     default: suffix = ''; break;
   }
   return tName + suffix;
@@ -805,6 +831,7 @@ export function parseChordString(str: string): Chord | null {
   else if (suffix === 'm7' || suffix === 'min7') quality = 'min7';
   else if (suffix === 'add9') quality = 'add9';
   else if (suffix === '6' || suffix === 'six') quality = 'six';
-  
+  else if (suffix === 'm7b5' || suffix === 'ø' || suffix === 'min7b5') quality = 'min7b5';
+
   return { root, quality };
 }

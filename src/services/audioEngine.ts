@@ -86,6 +86,7 @@ function getVoicingKey(chord: Chord): string {
     case 'min7': suffix = 'm7'; break;
     case 'add9': suffix = 'add9'; break;
     case 'six': suffix = '6'; break;
+    case 'min7b5': suffix = 'm7b5'; break;
   }
   return `${getScientificBase(chord.root)}${suffix}`;
 }

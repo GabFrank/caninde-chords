@@ -21,15 +21,16 @@ export const EMOTIONS: Record<string, EmotionSchema> = {
   luminoso: { id: 'luminoso', name: 'Luminoso / Alegre', color: 'from-amber-400 to-yellow-500 text-amber-950', emoji: '☀️' },
   melancolico: { id: 'melancolico', name: 'Melancólico', color: 'from-blue-400 to-indigo-500 text-blue-950', emoji: '🌙' },
   ingravidez: { id: 'ingravidez', name: 'Ingravidez / Flotar', color: 'from-green-400 to-emerald-500 text-green-950', emoji: '🎈' },
-  tension: { id: 'tension', name: 'Tensión / Suspenso', color: 'from-purple-500 to-violet-600 text-purple-95', emoji: '⚡' },
-  aire: { id: 'aire', name: 'Apertura / Aire', color: 'from-sky-400 to-teal-500 text-sky-95', emoji: '💨' },
-  empuje: { id: 'empuje', name: 'Empuje / Dominante', color: 'from-orange-500 to-amber-600 text-orange-95', emoji: '🚀' },
-  nostalgia: { id: 'nostalgia', name: 'Nostalgioso / Suspiro', color: 'from-pink-400 to-rose-500 text-pink-95', emoji: '🌸' },
-  asombro: { id: 'asombro', name: 'Asombro / Revelación', color: 'from-fuchsia-400 to-purple-600 text-fuchsia-95', emoji: '✨' },
-  profundidad: { id: 'profundidad', name: 'Profundidad / Mágico', color: 'from-indigo-500 to-violet-700 text-indigo-95', emoji: '🌊' },
-  suspenso: { id: 'suspenso', name: 'Suspenso / Pregunta', color: 'from-slate-400 to-zinc-600 text-slate-95', emoji: '❓' },
-  serenidad: { id: 'serenidad', name: 'Serenidad / Calma', color: 'from-teal-400 to-emerald-500 text-teal-95', emoji: '🍃' },
-  hipnotico: { id: 'hipnotico', name: 'Hipnótico / Drone', color: 'from-cyan-400 to-blue-500 text-cyan-95', emoji: '🌀' }
+  tension: { id: 'tension', name: 'Tensión / Suspenso', color: 'from-purple-500 to-violet-600 text-purple-950', emoji: '⚡' },
+  aire: { id: 'aire', name: 'Apertura / Aire', color: 'from-sky-400 to-teal-500 text-sky-950', emoji: '💨' },
+  empuje: { id: 'empuje', name: 'Empuje / Dominante', color: 'from-orange-500 to-amber-600 text-orange-950', emoji: '🚀' },
+  nostalgia: { id: 'nostalgia', name: 'Nostalgioso / Suspiro', color: 'from-pink-400 to-rose-500 text-pink-950', emoji: '🌸' },
+  asombro: { id: 'asombro', name: 'Asombro / Revelación', color: 'from-fuchsia-400 to-purple-600 text-fuchsia-950', emoji: '✨' },
+  profundidad: { id: 'profundidad', name: 'Profundidad / Mágico', color: 'from-indigo-500 to-violet-700 text-indigo-950', emoji: '🌊' },
+  suspenso: { id: 'suspenso', name: 'Suspenso / Pregunta', color: 'from-slate-400 to-zinc-600 text-slate-950', emoji: '❓' },
+  serenidad: { id: 'serenidad', name: 'Serenidad / Calma', color: 'from-teal-400 to-emerald-500 text-teal-950', emoji: '🍃' },
+  hipnotico: { id: 'hipnotico', name: 'Hipnótico / Drone', color: 'from-cyan-400 to-blue-500 text-cyan-950', emoji: '🌀' },
+  misterio: { id: 'misterio', name: 'Misterio / Sombra', color: 'from-violet-500 to-purple-700 text-violet-950', emoji: '🔮' }
 };
 
 interface ToolInfo {
