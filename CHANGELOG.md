@@ -1,3 +1,10 @@
+# [2.4.0](https://github.com/GabFrank/caninde-chords/compare/v2.3.0...v2.4.0) (2026-06-07)
+
+
+### Features
+
+* puente Manual -> Compositor (REQ-MAN-04) ([fb8720a](https://github.com/GabFrank/caninde-chords/commit/fb8720adb493b3f5438f993c78aecf380158511d))
+
 # [2.3.0](https://github.com/GabFrank/caninde-chords/compare/v2.2.0...v2.3.0) (2026-06-07)
 
 
