@@ -37,6 +37,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Test (Harmony Engine)
+        run: npm test
+
       - name: Semantic Release (versionado automático)
         run: npx semantic-release
         env:
