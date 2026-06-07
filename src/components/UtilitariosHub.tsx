@@ -98,7 +98,7 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong, 
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.18 }}
             >
-              <HarmonyManual onOpenInComposer={handleOpenInComposer} lang={lang} />
+              <HarmonyManual onOpenInComposer={handleOpenInComposer} />
             </motion.div>
           )}
         </AnimatePresence>
