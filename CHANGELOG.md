@@ -1,3 +1,10 @@
+# [2.3.0](https://github.com/GabFrank/caninde-chords/compare/v2.2.0...v2.3.0) (2026-06-07)
+
+
+### Features
+
+* patrones de ritmo reales en el Compositor (Apéndice B) ([826cd2b](https://github.com/GabFrank/caninde-chords/commit/826cd2b04f58936d23f3d82f213c717bcacb9240))
+
 # [2.2.0](https://github.com/GabFrank/caninde-chords/compare/v2.1.2...v2.2.0) (2026-06-07)
 
 
