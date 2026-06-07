@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/GabFrank/caninde-chords/compare/v2.1.1...v2.1.2) (2026-06-07)
+
+
+### Bug Fixes
+
+* correcciones del motor de teoría armónica (REQ-HRM-03 y fidelidad) ([9dc7708](https://github.com/GabFrank/caninde-chords/commit/9dc7708051f0fea3f89a0760b3f75bc02ce2c2a4))
+
 ## [2.1.1](https://github.com/GabFrank/caninde-chords/compare/v2.1.0...v2.1.1) (2026-06-07)
 
 
