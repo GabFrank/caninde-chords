@@ -4,6 +4,7 @@ import {
   getAugmentedPortalCandidates, getCandidates, getDiminishedBridgeCandidates,
   getChromaticMediantCandidates, getDiatonicLadder, analyzeGesture,
   computePhase, getChordString, SongExportAdapter,
+  getAllCandidates, getKeepMoodCandidates, getRootVariations,
   Chord, Slot, Composition, Quality, Tool
 } from './harmonyEngine';
 
@@ -89,6 +90,27 @@ describe('REQ-FAS: computePhase (ejemplo de la sección 10)', () => {
   });
   it('vacío -> Anclaje', () => {
     expect(computePhase([]).phase).toBe('Anclaje');
+  });
+});
+
+describe('modo Sencillo (emotion-first)', () => {
+  const key = { tonic: 0, mode: 'major' as const };
+  it('getAllCandidates no incluye el actual ni duplicados', () => {
+    const cands = getAllCandidates(C, key);
+    expect(cands.length).toBeGreaterThan(0);
+    const keys = cands.map(c => `${c.chord.root}_${c.chord.quality}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).not.toContain('0_major');
+  });
+  it('getKeepMoodCandidates respeta el límite y excluye el actual', () => {
+    const keep = getKeepMoodCandidates(C, key, 4);
+    expect(keep.length).toBeLessThanOrEqual(4);
+    expect(keep.every(c => !(c.chord.root === 0 && c.chord.quality === 'major'))).toBe(true);
+  });
+  it('getRootVariations devuelve variaciones del root con emoción en contexto', () => {
+    const vars = getRootVariations(C, 7); // sobre G
+    expect(vars.length).toBeGreaterThan(5);
+    expect(vars.every(v => v.chord.root === 7 && typeof v.emotion === 'string')).toBe(true);
   });
 });
 

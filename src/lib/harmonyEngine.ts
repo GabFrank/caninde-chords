@@ -496,9 +496,51 @@ export function getCandidates(tool: Tool, cur: Chord, key: { tonic: PitchClass; 
   });
 }
 
+// Pooled candidates from every tool, deduped by chord (for the emotion-first /
+// "simple" composing mode). Pure.
+export function getAllCandidates(cur: Chord, key: { tonic: PitchClass; mode: 'major' | 'minor' }): Candidate[] {
+  const tools: Tool[] = ['diatonic', 'augmentedPortal', 'diminishedBridge', 'chromaticMediant', 'modalColor', 'cadence'];
+  const all: Candidate[] = [];
+  for (const t of tools) all.push(...getCandidates(t, cur, key));
+  const seen = new Set<string>();
+  const out: Candidate[] = [];
+  for (const c of all) {
+    const k = `${c.chord.root}_${c.chord.quality}`;
+    if (c.chord.root === cur.root && c.chord.quality === cur.quality) continue;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(c);
+  }
+  return out;
+}
+
+// Candidates that PRESERVE the current mood: many common tones, little voice
+// movement, small change in intensity, ideally same emotion family.
+export function getKeepMoodCandidates(cur: Chord, key: { tonic: PitchClass; mode: 'major' | 'minor' }, limit = 4): Candidate[] {
+  const curEmotion = getDefaultEmotionFor(cur.quality);
+  const curAstral = getDefaultAstralFor(cur.quality);
+  const scored = getAllCandidates(cur, key).map(c => {
+    const common = commonTones(cur, c.chord).length;
+    const move = estimateVoiceLeadingDistance(cur, c.chord);
+    const astralDelta = Math.abs(c.astralLevel - curAstral);
+    let score = common * 2 - move * 0.5 - astralDelta;
+    if (c.emotion === curEmotion) score += 3;
+    return { c, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map(s => s.c);
+}
+
+// Variations of a chosen root, each annotated with its emotion in the current
+// context (for the "free choice" explorer of the simple mode).
+export function getRootVariations(cur: Chord, root: PitchClass): Candidate[] {
+  const qualities: Quality[] = ['major', 'minor', 'dom7', 'maj7', 'min7', 'sus2', 'sus4', 'add9', 'six', 'aug', 'dim7', 'min7b5'];
+  return qualities.map(q => annotate(cur, { root: mod12(root), quality: q }, 'free'));
+}
+
 // Inverse function: given a list of transitions, analyze a full sequence
-export function analyzeGesture(a: Chord, b: Chord, key?: { tonic: PitchClass; mode: 'major' | 'minor' }): { 
-  gesture: string; 
+export function analyzeGesture(a: Chord, b: Chord, key?: { tonic: PitchClass; mode: 'major' | 'minor' }): {
+  gesture: string;
   emotion: string; 
   astral: number; 
   rationale: string; 

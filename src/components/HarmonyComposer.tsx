@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Square, Plus, Trash2, Copy, Sparkles, AlertCircle, Compass, HelpCircle, ArrowUpRight, ArrowDownRight, RefreshCw, Save, FileSpreadsheet, Eye, Music, Edit2, Volume2, ArrowLeft, ArrowRight, ChevronDown, Check, MoreVertical, Clock } from 'lucide-react';
-import { PitchClass, Quality, Chord, Tool, Slot, Composition, getCandidates, computePhase, analyzeGesture, getChordString, getPitchClassName, getDefaultAstralFor, getDiatonicLadder, parseChordString, SongExportAdapter, mod12, parsePitchClass } from '../lib/harmonyEngine';
+import { PitchClass, Quality, Chord, Tool, Slot, Composition, getCandidates, getAllCandidates, getKeepMoodCandidates, getRootVariations, computePhase, analyzeGesture, getChordString, getPitchClassName, getDefaultAstralFor, getDiatonicLadder, parseChordString, SongExportAdapter, mod12, parsePitchClass } from '../lib/harmonyEngine';
 import { audioEngine, getVoicingForChord, RHYTHM_PATTERNS } from '../services/audioEngine';
 import { db, auth } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot } from 'firebase/firestore';
@@ -31,6 +31,37 @@ export const EMOTIONS: Record<string, EmotionSchema> = {
   serenidad: { id: 'serenidad', name: 'Serenidad / Calma', color: 'from-teal-400 to-emerald-500 text-teal-950', emoji: '🍃' },
   hipnotico: { id: 'hipnotico', name: 'Hipnótico / Drone', color: 'from-cyan-400 to-blue-500 text-cyan-950', emoji: '🌀' },
   misterio: { id: 'misterio', name: 'Misterio / Sombra', color: 'from-violet-500 to-purple-700 text-violet-950', emoji: '🔮' }
+};
+
+// Curated, human-friendly emotion buckets for the Simple mode. Each maps to one
+// or more internal taxonomy ids (Appendix D).
+interface EmotionGroup { id: string; es: string; en: string; emoji: string; emotions: string[]; }
+const EMOTION_GROUPS: EmotionGroup[] = [
+  { id: 'esperanza', es: 'Esperanza / Luz', en: 'Hope / Light', emoji: '☀️', emotions: ['luminoso', 'asombro'] },
+  { id: 'calma', es: 'Calma / Serenidad', en: 'Calm / Serenity', emoji: '🍃', emotions: ['serenidad', 'aire'] },
+  { id: 'tristeza', es: 'Tristeza dulce', en: 'Sweet sadness', emoji: '🌙', emotions: ['melancolico', 'nostalgia'] },
+  { id: 'tension', es: 'Tensión', en: 'Tension', emoji: '⚡', emotions: ['tension', 'suspenso'] },
+  { id: 'misterio', es: 'Misterio', en: 'Mystery', emoji: '🔮', emotions: ['misterio', 'profundidad'] },
+  { id: 'asombro', es: 'Asombro / Épico', en: 'Awe / Epic', emoji: '✨', emotions: ['asombro'] },
+  { id: 'flotar', es: 'Flotar / Sueño', en: 'Floating / Dream', emoji: '🎈', emotions: ['ingravidez', 'hipnotico'] },
+  { id: 'fuerza', es: 'Fuerza / Empuje', en: 'Drive / Push', emoji: '🚀', emotions: ['empuje'] }
+];
+
+// Plain-language description of where the progression currently is (by quality).
+const CHORD_MOOD: Record<string, { es: string; en: string }> = {
+  major: { es: 'luminoso y estable', en: 'bright and stable' },
+  minor: { es: 'sombrío e íntimo, con una pregunta abierta', en: 'dark and intimate, with an open question' },
+  dom7: { es: 'con ganas de resolver, empuje', en: 'wants to resolve, driving' },
+  maj7: { es: 'dulce y soñador', en: 'sweet and dreamy' },
+  min7: { es: 'melancolía cálida y suave', en: 'warm, soft melancholy' },
+  aug: { es: 'extraño, suspendido, ingrávido', en: 'strange, suspended, weightless' },
+  dim: { es: 'tenso e inestable', en: 'tense and unstable' },
+  dim7: { es: 'muy tenso, a punto de girar', en: 'very tense, about to turn' },
+  sus2: { es: 'abierto y aireado, sin definir', en: 'open and airy, undefined' },
+  sus4: { es: 'expectante, en suspenso', en: 'expectant, suspended' },
+  add9: { es: 'luminoso con un brillo extra', en: 'bright with extra shimmer' },
+  six: { es: 'dulce y nostálgico, vintage', en: 'sweet and nostalgic, vintage' },
+  min7b5: { es: 'inquietante, a la deriva', en: 'uneasy, adrift' }
 };
 
 interface ToolInfo {
@@ -83,6 +114,12 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
   const [tempLyric, setTempLyric] = useState('');
   const [editKeyModal, setEditKeyModal] = useState(false);
   const [menuSlotIdx, setMenuSlotIdx] = useState<number | null>(null);
+  // Simple (emotion-first) mode
+  const [wizardMode, setWizardMode] = useState<'simple' | 'advanced'>('simple');
+  const [simpleStep, setSimpleStep] = useState<'choose' | 'list' | 'freeNotes' | 'freeQualities'>('choose');
+  const [simpleList, setSimpleList] = useState<any[]>([]);
+  const [simpleTitle, setSimpleTitle] = useState('');
+  const [freeRoot, setFreeRoot] = useState<number | null>(null);
 
   const playTimerRef = useRef<number | null>(null);
   const playIdxRef = useRef<number>(0);
@@ -228,7 +265,83 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
     // REQ-CMP-02: el primer acorde se elige libremente desde la escalera del tono.
     setSelectedTool('diatonic');
     setWizardStep(currentComp.slots.length === 0 ? 2 : 1);
+    setSimpleStep('choose');
+    setFreeRoot(null);
     setIsWizardOpen(true);
+  };
+
+  // ----- Simple (emotion-first) mode helpers -----
+  const lastChord = currentComp && currentComp.slots.length > 0
+    ? currentComp.slots[currentComp.slots.length - 1].chord
+    : null;
+
+  const describeChord = (c: Chord) => {
+    const m = CHORD_MOOD[c.quality];
+    return m ? (lang === 'en' ? m.en : m.es) : '';
+  };
+
+  const enterKeepMood = () => {
+    if (!currentComp || !lastChord) return;
+    setSimpleList(getKeepMoodCandidates(lastChord, currentComp.key));
+    setSimpleTitle(tr('Mantener el clima', 'Keep the mood'));
+    setSimpleStep('list');
+  };
+
+  const enterEmotionGroup = (group: EmotionGroup) => {
+    if (!currentComp || !lastChord) return;
+    const all = getAllCandidates(lastChord, currentComp.key);
+    const filtered = all.filter(c => group.emotions.includes(c.emotion));
+    setSimpleList(filtered.length > 0 ? filtered : all.slice(0, 6));
+    setSimpleTitle(lang === 'en' ? group.en : group.es);
+    setSimpleStep('list');
+  };
+
+  const enterFreeQualities = (root: number) => {
+    setFreeRoot(root);
+    setSimpleStep('freeQualities');
+  };
+
+  // Reusable candidate card (used by advanced step 2 and the simple lists).
+  const renderCandidate = (cand: any, idx: number) => {
+    const emo = EMOTIONS[cand.emotion] || { name: 'Libre', color: 'bg-zinc-600', emoji: '⭐' };
+    return (
+      <div
+        key={idx}
+        onClick={() => handleSelectCandidate(cand)}
+        className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-blue-600 rounded-2xl transition-all flex flex-col justify-between h-40 cursor-pointer shadow-sm relative group"
+      >
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-lg font-black font-mono tracking-tight text-zinc-900 dark:text-white">
+              {getChordString(cand.chord)}
+            </p>
+            <p className="text-[9px] text-zinc-400 font-mono italic mt-0.5">{cand.gesture}</p>
+          </div>
+          <span className="text-lg">{emo.emoji}</span>
+        </div>
+
+        <p className="text-[10px] text-zinc-500 pr-8 leading-snug">{cand.rationale}</p>
+
+        <div className="flex justify-between items-center border-t border-zinc-100 dark:border-zinc-800 pt-2.5 bg-transparent gap-1">
+          {cand.role && (
+            <span className="text-[9px] font-bold font-mono text-zinc-400 truncate">{cand.role}</span>
+          )}
+          <span className="text-[10px] ml-auto font-mono text-zinc-400 flex items-center gap-1">
+            {cand.direction === 'up' && <ArrowUpRight size={11} className="text-green-500" />}
+            {cand.direction === 'down' && <ArrowDownRight size={11} className="text-amber-500" />}
+            ✨ {cand.astralLevel}
+          </span>
+        </div>
+
+        <button
+          onClick={(e) => handlePreviewCandidate(cand, e)}
+          className="absolute bottom-3 right-3 p-2 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500"
+          title={tr('Oír sugerencia', 'Hear suggestion')}
+        >
+          <Volume2 size={13} />
+        </button>
+      </div>
+    );
   };
 
   const handleSelectTool = (tool: Tool) => {
@@ -752,32 +865,72 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
             >
               
               {/* Header */}
-              <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center shrink-0">
-                <div className="flex items-center gap-2">
-                  {wizardStep === 2 && currentComp && currentComp.slots.length > 0 && (
-                    <button onClick={() => setWizardStep(1)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full">
+              <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center shrink-0 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  {currentComp && currentComp.slots.length > 0 && (
+                    (wizardMode === 'advanced' && wizardStep === 2) ||
+                    (wizardMode === 'simple' && simpleStep !== 'choose')
+                  ) && (
+                    <button
+                      onClick={() => {
+                        if (wizardMode === 'advanced') setWizardStep(1);
+                        else setSimpleStep(simpleStep === 'freeQualities' ? 'freeNotes' : 'choose');
+                      }}
+                      className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full shrink-0"
+                    >
                       <ArrowLeft size={16} />
                     </button>
                   )}
-                  <h3 className="text-lg font-black font-sans">
-                    {wizardStep === 1
-                      ? tr('Paso 1: ¿Qué herramienta armónica usar?', 'Step 1: Which harmonic tool?')
-                      : (currentComp && currentComp.slots.length === 0
-                        ? tr('Elige el primer acorde (escalera del tono)', 'Choose the first chord (key ladder)')
-                        : tr('Paso 2: Elige tu próximo acorde', 'Step 2: Choose your next chord'))}
+                  <h3 className="text-base font-black font-sans truncate">
+                    {currentComp && currentComp.slots.length === 0
+                      ? tr('Elige cómo empezar', 'Choose how to start')
+                      : wizardMode === 'advanced'
+                        ? (wizardStep === 1 ? tr('¿Qué herramienta usar?', 'Which tool?') : tr('Elige tu acorde', 'Choose your chord'))
+                        : simpleStep === 'choose' ? tr('¿Hacia dónde quieres ir?', 'Where do you want to go?')
+                        : simpleStep === 'freeNotes' ? tr('Elige una nota', 'Choose a note')
+                        : simpleStep === 'freeQualities' ? tr('Variaciones', 'Variations')
+                        : simpleTitle}
                   </h3>
                 </div>
-                <button
-                  onClick={() => setIsWizardOpen(false)}
-                  className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {currentComp && currentComp.slots.length > 0 && (
+                    <div className="flex items-center gap-0.5 p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                      <button
+                        onClick={() => setWizardMode('simple')}
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold ${wizardMode === 'simple' ? 'bg-white dark:bg-zinc-900 text-blue-600 shadow-sm' : 'text-zinc-500'}`}
+                      >
+                        {tr('Sencillo', 'Simple')}
+                      </button>
+                      <button
+                        onClick={() => setWizardMode('advanced')}
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold ${wizardMode === 'advanced' ? 'bg-white dark:bg-zinc-900 text-blue-600 shadow-sm' : 'text-zinc-500'}`}
+                      >
+                        {tr('Avanzado', 'Advanced')}
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setIsWizardOpen(false)}
+                    className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
               {/* Scrollable Content inside Step 1 or Step 2 */}
               <div className="p-6 overflow-y-auto space-y-4">
-                {wizardStep === 1 ? (
+                {currentComp && currentComp.slots.length === 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-[10px] text-zinc-400 italic flex items-center gap-1">
+                      <HelpCircle size={11} /> {tr('Elige el acorde inicial desde la escalera del tono.', 'Pick the starting chord from the key ladder.')}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {getWizardCandidates().map((cand, idx) => renderCandidate(cand, idx))}
+                    </div>
+                  </div>
+                ) : wizardMode === 'advanced' ? (
+                  wizardStep === 1 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {TOOLS_INFO.map(tool => (
                       <button
@@ -864,6 +1017,64 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                       })}
                     </div>
                   </div>
+                  )
+                ) : (
+                  simpleStep === 'choose' ? (
+                    <div className="space-y-4">
+                      {lastChord && (
+                        <div className="p-3 rounded-2xl bg-zinc-100/70 dark:bg-zinc-800/40 text-center">
+                          <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-mono block">{tr('Estás en', 'You are on')}</span>
+                          <span className="text-lg font-black font-mono text-zinc-900 dark:text-white">{getChordString(lastChord)}</span>
+                          <p className="text-[11px] text-zinc-500 mt-0.5">{describeChord(lastChord)}</p>
+                        </div>
+                      )}
+                      <button onClick={enterKeepMood} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-bold text-sm border border-blue-200/50 dark:border-blue-800/40">
+                        🔁 {tr('Mantener el clima', 'Keep the mood')}
+                      </button>
+                      <div>
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest font-mono mb-2">{tr('O cambiar la emoción', 'Or change the emotion')}</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {EMOTION_GROUPS.map(g => (
+                            <button key={g.id} onClick={() => enterEmotionGroup(g)} className="p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 flex flex-col items-center gap-1 transition-all">
+                              <span className="text-2xl">{g.emoji}</span>
+                              <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-200 text-center leading-tight">{lang === 'en' ? g.en : g.es}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button onClick={() => setSimpleStep('freeNotes')} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold text-sm">
+                        🎚️ {tr('Elegir yo (libre)', 'Choose myself (free)')}
+                      </button>
+                      <p className="text-[10px] text-zinc-400 italic flex items-center gap-1">
+                        <HelpCircle size={11} /> {tr('Las emociones son tendencias, no garantías.', 'Emotions are tendencies, not guarantees.')}
+                      </p>
+                    </div>
+                  ) : simpleStep === 'freeNotes' ? (
+                    <div className="grid grid-cols-4 gap-2">
+                      {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map((n, pitch) => (
+                        <button key={n} onClick={() => enterFreeQualities(pitch)} className="py-3 rounded-xl border border-zinc-200 dark:border-zinc-800 font-bold font-mono text-sm hover:border-blue-500 hover:text-blue-600 transition-all">
+                          {getPitchClassName(pitch)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : simpleStep === 'freeQualities' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {lastChord && freeRoot !== null && getRootVariations(lastChord, freeRoot).map((cand, idx) => renderCandidate(cand, idx))}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-[10px] text-zinc-400 italic flex items-center gap-1">
+                        <HelpCircle size={11} /> {tr('Las emociones son tendencias, no garantías.', 'Emotions are tendencies, not guarantees.')}
+                      </p>
+                      {simpleList.length === 0 ? (
+                        <p className="text-xs text-zinc-400 text-center py-6">{tr('No encontré opciones claras aquí. Prueba otra emoción o el modo libre.', 'No clear options here. Try another emotion or free mode.')}</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {simpleList.map((cand, idx) => renderCandidate(cand, idx))}
+                        </div>
+                      )}
+                    </div>
+                  )
                 )}
               </div>
 
