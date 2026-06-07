@@ -139,9 +139,11 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
     if (!compToSave.id) return;
     try {
       const { id, ...data } = compToSave;
+      // Send `meta` as a single object: updating both `meta` and `meta.updatedAt`
+      // in the same call is a Firestore field-path conflict and throws.
       await updateDoc(doc(db, 'compositions', id), {
         ...data,
-        'meta.updatedAt': new Date().toISOString()
+        meta: { ...data.meta, updatedAt: new Date().toISOString() }
       });
     } catch (e) {
       console.error('Error saving composition', e);
