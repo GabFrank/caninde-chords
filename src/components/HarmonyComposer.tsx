@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Square, Plus, Trash2, Copy, Sparkles, AlertCircle, Compass, HelpCircle, ArrowUpRight, ArrowDownRight, RefreshCw, Save, FileSpreadsheet, Eye, Music, Edit2, Volume2, ArrowLeft, ArrowRight, ChevronDown, Check } from 'lucide-react';
+import { Play, Square, Plus, Trash2, Copy, Sparkles, AlertCircle, Compass, HelpCircle, ArrowUpRight, ArrowDownRight, RefreshCw, Save, FileSpreadsheet, Eye, Music, Edit2, Volume2, ArrowLeft, ArrowRight, ChevronDown, Check, MoreVertical, Clock } from 'lucide-react';
 import { PitchClass, Quality, Chord, Tool, Slot, Composition, getCandidates, computePhase, analyzeGesture, getChordString, getPitchClassName, getDefaultAstralFor, getDiatonicLadder, parseChordString, SongExportAdapter, mod12, parsePitchClass } from '../lib/harmonyEngine';
 import { audioEngine, getVoicingForChord, RHYTHM_PATTERNS } from '../services/audioEngine';
 import { db, auth } from '../firebase';
@@ -82,6 +82,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
   const [editSlotIdx, setEditSlotIdx] = useState<number | null>(null);
   const [tempLyric, setTempLyric] = useState('');
   const [editKeyModal, setEditKeyModal] = useState(false);
+  const [menuSlotIdx, setMenuSlotIdx] = useState<number | null>(null);
 
   const playTimerRef = useRef<number | null>(null);
   const playIdxRef = useRef<number>(0);
@@ -600,27 +601,19 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                   const emo = EMOTIONS[slot.emotion || 'libre'] || { name: 'Libre', color: 'from-zinc-500 to-zinc-600 text-zinc-950', emoji: '⭐' };
                   
                   return (
-                    <div key={slot.id} className="flex items-center relative gap-2 shrink-0">
-                      
-                      {/* Left-right Arrows */}
-                      <div className="absolute top-2 left-2 right-2 flex justify-between items-center opacity-0 hover:opacity-100 transition-opacity z-10">
-                        {i > 0 && (
-                          <button onClick={() => moveSlot(i, 'left')} className="p-1 bg-white dark:bg-zinc-800 rounded shadow text-zinc-600 dark:text-zinc-300">
-                            <ArrowLeft size={10} />
-                          </button>
-                        )}
-                        {i < currentComp.slots.length - 1 && (
-                          <button onClick={() => moveSlot(i, 'right')} className="p-1 bg-white dark:bg-zinc-800 rounded shadow text-zinc-600 dark:text-zinc-300">
-                            <ArrowRight size={10} />
-                          </button>
-                        )}
-                      </div>
-
-                      <motion.div
-                        className={`w-36 h-48 rounded-2xl border flex flex-col justify-between p-4 bg-gradient-to-br transition-all relative ${activePlaySlotIdx === i ? 'border-blue-500 ring-4 ring-blue-500/20 scale-105 shadow-xl' : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm'}`}
+                    <div key={slot.id} className="flex items-center gap-2 shrink-0">
+                      <motion.button
+                        type="button"
+                        onClick={() => setMenuSlotIdx(i)}
+                        className={`w-36 h-48 rounded-2xl border flex flex-col justify-between p-4 text-left transition-all relative ${activePlaySlotIdx === i ? 'border-blue-500 ring-4 ring-blue-500/20 scale-105 shadow-xl' : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:border-blue-400'}`}
                       >
+                        {/* Options affordance */}
+                        <span className="absolute top-2 right-2 text-zinc-300 dark:text-zinc-600">
+                          <MoreVertical size={16} />
+                        </span>
+
                         {/* Chord representation info */}
-                        <div className="flex justify-between items-start">
+                        <div className="flex justify-between items-start pr-5">
                           <div>
                             <span className="text-xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">
                               {getChordString(slot.chord)}
@@ -629,51 +622,32 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                               {slot.gesture || tr('Paso', 'Step')}
                             </div>
                           </div>
-                          
                           <span className="text-lg">{emo.emoji}</span>
                         </div>
 
                         {/* Middle Lyric Label */}
-                        <div className="my-1 text-center">
+                        <div className="my-1 text-center min-h-[14px]">
                           {slot.lyric ? (
                             <p className="text-[10px] italic text-zinc-600 dark:text-zinc-300 truncate font-sans">
                               "{slot.lyric}"
                             </p>
                           ) : (
-                            <button
-                              onClick={() => { setEditSlotIdx(i); setTempLyric(''); }}
-                              className="text-[9px] text-blue-500 font-bold hover:underline"
-                            >
-                              {tr('+ Letra', '+ Lyric')}
-                            </button>
+                            <span className="text-[9px] text-zinc-300 dark:text-zinc-600">
+                              {tr('toca para opciones', 'tap for options')}
+                            </span>
                           )}
                         </div>
 
-                        {/* Footer stats: quality, tool and astral lvl */}
+                        {/* Footer stats: duration and astral lvl */}
                         <div className="border-t border-zinc-100 dark:border-zinc-800 pt-2 flex justify-between items-center bg-transparent">
-                          <button
-                            onClick={() => handleCycleDuration(i)}
-                            title="Cambiar duración"
-                            className="text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                          >
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
                             {slot.durationBeats} beats
-                          </button>
-                          
+                          </span>
                           <span className="text-[10px] font-bold font-mono text-zinc-500" title="Nivel Astral">
                             ✨ {slot.astralLevel}
                           </span>
                         </div>
-
-                        {/* Top corner options picker */}
-                        <div className="absolute top-2 right-2 flex items-center gap-0.5 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 rounded bg-white/80 dark:bg-zinc-900/80 p-0.5">
-                          <button onClick={() => handleDuplicateSlot(i)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-400" title={tr('Duplicar', 'Duplicate')}>
-                            <Copy size={11} />
-                          </button>
-                          <button onClick={() => handleDeleteSlot(i)} className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-red-500" title={tr('Eliminar', 'Delete')}>
-                            <Trash2 size={11} />
-                          </button>
-                        </div>
-                      </motion.div>
+                      </motion.button>
 
                       {/* Direction Connector */}
                       {i < currentComp.slots.length - 1 && (
@@ -896,6 +870,63 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      {/* MODAL: Slot action menu (touch-friendly) */}
+      <AnimatePresence>
+        {menuSlotIdx !== null && currentComp && currentComp.slots[menuSlotIdx] && (() => {
+          const idx = menuSlotIdx;
+          const s = currentComp.slots[idx];
+          const isFirst = idx === 0;
+          const isLast = idx === currentComp.slots.length - 1;
+          const close = () => setMenuSlotIdx(null);
+          const itemCls = 'w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm font-bold text-zinc-700 dark:text-zinc-200 transition-colors';
+          return (
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={close}>
+              <motion.div
+                initial={{ y: 30, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 30, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-3xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-2xl space-y-2"
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800 mb-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-black font-mono text-zinc-900 dark:text-white">{getChordString(s.chord)}</span>
+                    <span className="text-[10px] text-zinc-400 font-mono">{s.gesture}</span>
+                  </div>
+                  <button onClick={close} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400">✕</button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button disabled={isFirst} onClick={() => { moveSlot(idx, 'left'); close(); }} className={`${itemCls} justify-center disabled:opacity-30`}>
+                    <ArrowLeft size={16} /> {tr('Mover izq.', 'Move left')}
+                  </button>
+                  <button disabled={isLast} onClick={() => { moveSlot(idx, 'right'); close(); }} className={`${itemCls} justify-center disabled:opacity-30`}>
+                    <ArrowRight size={16} /> {tr('Mover der.', 'Move right')}
+                  </button>
+                </div>
+
+                <button onClick={() => handleCycleDuration(idx)} className={`${itemCls} justify-between`}>
+                  <span className="flex items-center gap-2"><Clock size={16} /> {tr('Duración', 'Duration')}</span>
+                  <span className="font-mono text-blue-600">{s.durationBeats} beats →</span>
+                </button>
+
+                <button onClick={() => { setEditSlotIdx(idx); setTempLyric(s.lyric || ''); close(); }} className={itemCls}>
+                  <Edit2 size={16} /> {s.lyric ? tr('Editar letra', 'Edit lyric') : tr('Añadir letra', 'Add lyric')}
+                </button>
+
+                <button onClick={() => { handleDuplicateSlot(idx); close(); }} className={itemCls}>
+                  <Copy size={16} /> {tr('Duplicar', 'Duplicate')}
+                </button>
+
+                <button onClick={() => { handleDeleteSlot(idx); close(); }} className="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 text-sm font-bold transition-colors">
+                  <Trash2 size={16} /> {tr('Eliminar', 'Delete')}
+                </button>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* MODAL: Edit Lyrics */}
