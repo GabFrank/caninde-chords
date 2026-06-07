@@ -1,3 +1,10 @@
+# [2.5.0](https://github.com/GabFrank/caninde-chords/compare/v2.4.0...v2.5.0) (2026-06-07)
+
+
+### Features
+
+* ajustes finos del Compositor (cadencia, compás, primer acorde, debounce) ([ae0f39e](https://github.com/GabFrank/caninde-chords/commit/ae0f39e711352209a92969470a7f4011696015c1)), closes [#28](https://github.com/GabFrank/caninde-chords/issues/28) [#18](https://github.com/GabFrank/caninde-chords/issues/18) [#17](https://github.com/GabFrank/caninde-chords/issues/17) [#24](https://github.com/GabFrank/caninde-chords/issues/24) [#25](https://github.com/GabFrank/caninde-chords/issues/25)
+
 # [2.4.0](https://github.com/GabFrank/caninde-chords/compare/v2.3.0...v2.4.0) (2026-06-07)
 
 
