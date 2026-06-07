@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/GabFrank/caninde-chords/compare/v2.1.0...v2.1.1) (2026-06-07)
+
+
+### Bug Fixes
+
+* persistencia del Compositor de maquetas (reglas Firestore + guardado) ([1b1daeb](https://github.com/GabFrank/caninde-chords/commit/1b1daeb024c82f4c5d76689fb41c76f3166968b6))
+
 # [2.1.0](https://github.com/GabFrank/caninde-chords/compare/v2.0.2...v2.1.0) (2026-06-07)
 
 
