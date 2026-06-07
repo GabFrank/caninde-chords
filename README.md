@@ -1,20 +1,33 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+<img width="192" height="192" alt="CanindeChords" src="public/CanindeChords.png" />
 </div>
 
-# Run and deploy your AI Studio app
+# CanindeChords
 
-This contains everything you need to run your app locally.
+Gestor colaborativo de canciones, acordes y setlists para músicos, con
+sincronización en tiempo real (Modo Director). PWA construida con React + Vite +
+Firebase. Creada originalmente en Google AI Studio.
 
-View your app in AI Studio: https://ai.studio/apps/441c4547-dc9f-4785-aed8-fdbd3879497c
+## Arranque rápido
 
-## Run Locally
+**Requisitos:** Node.js 22+
 
-**Prerequisites:**  Node.js
+```bash
+npm install
+# Edita .env.local y pon tu GEMINI_API_KEY (ver .env.example)
+npm run dev      # http://localhost:3000
+```
 
+## Publicación
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+La app se publica automáticamente en **Firebase Hosting** al hacer push a `main`
+(vía GitHub Actions). La configuración completa de desarrollo y deploy está en
+**[DEPLOY.md](DEPLOY.md)**.
+
+URL pública: https://franco-control.web.app
+
+## Documentación
+
+- **[DEPLOY.md](DEPLOY.md)** — desarrollo local, secrets y publicación.
+- **[AGENTS.md](AGENTS.md)** — arquitectura, reglas de negocio y workflows.
+- **[TODO.md](TODO.md)** — backlog de mejoras.
