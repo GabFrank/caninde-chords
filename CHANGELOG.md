@@ -1,3 +1,10 @@
+# [2.11.0](https://github.com/GabFrank/caninde-chords/compare/v2.10.0...v2.11.0) (2026-06-07)
+
+
+### Features
+
+* **taller:** modo Sencillo (composición guiada por emoción) ([bd4dc07](https://github.com/GabFrank/caninde-chords/commit/bd4dc07f80414e363d06768625ebdfd932be6f8e))
+
 # [2.10.0](https://github.com/GabFrank/caninde-chords/compare/v2.9.0...v2.10.0) (2026-06-07)
 
 
