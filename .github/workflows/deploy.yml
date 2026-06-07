@@ -57,6 +57,10 @@ jobs:
           channelId: live
 
       - name: Deploy Firestore rules
+        # La cuenta de servicio firebase-adminsdk no tiene permiso de serviceusage
+        # para el pre-chequeo de API; si falla no debe tumbar el deploy de hosting.
+        # En cuanto se le concedan los roles necesarios, este paso desplegará solo.
+        continue-on-error: true
         run: |
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"

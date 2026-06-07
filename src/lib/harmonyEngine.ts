@@ -629,55 +629,48 @@ export function computePhase(slots: Slot[]): PhaseResult {
 // Bidirectional adapters for Song exporting/importing (Section 12)
 export class SongExportAdapter {
   static toHostSongContent(comp: Composition): string {
-    // Generate raw string representation
-    let text = `[Capo 0]\n`;
-    
-    // Header block
-    text += `[Title: ${comp.title}]\n`;
-    text += `[Key: ${getPitchClassName(comp.key.tonic)} ${comp.key.mode}]\n`;
-    text += `[BPM: ${comp.tempo.bpm}]\n\n`;
-
-    // Metadatos armónicos en un bloque XML/JSON propio con espacio de nombres para no romper compatibilidad (REQ-INT-03)
-    text += `[HarmonySectionIndex: START_METADATA]\n`;
-    const serializedSlots = comp.slots.map(s => ({
-      c: { r: s.chord.root, q: s.chord.quality },
-      t: s.toolUsed,
-      g: s.gesture,
-      e: s.emotion,
-      a: s.astralLevel,
-      d: s.durationBeats,
-      v: s.voicing ? s.voicing.frets : null,
-      l: s.lyric || ''
-    }));
-    text += `[HarmonyMetadata: ${JSON.stringify(serializedSlots)}]\n`;
-    text += `[HarmonySectionIndex: END_METADATA]\n\n`;
-
-    // Render song body formatted in lyric system with chords on top
-    text += `.Intro\n`;
+    // Clean chord/lyric body in OpenSong-compatible inline [chord] format.
+    let body = `.Intro\n`;
     comp.slots.forEach((slot, idx) => {
       const isLast = idx === comp.slots.length - 1;
       const chName = getChordString(slot.chord);
-      text += `[${chName}] `;
-      if (slot.lyric) {
-        text += `${slot.lyric} `;
-      }
-      if ((idx + 1) % 4 === 0 && !isLast) {
-        text += `\n`;
-      }
+      body += `[${chName}]${slot.lyric ? ' ' + slot.lyric : ''} `;
+      if ((idx + 1) % 4 === 0 && !isLast) body += `\n`;
     });
 
-    return text;
+    // Harmony metadata in a namespaced, bracket-free (base64) block so it never
+    // collides with the [chord] syntax and round-trips without loss (REQ-INT-03/REQ-DAT-01).
+    const payload = {
+      key: comp.key,
+      tempo: comp.tempo,
+      defaultArticulation: comp.defaultArticulation,
+      rhythmPatternId: comp.rhythmPatternId,
+      slots: comp.slots.map(s => ({
+        c: { r: s.chord.root, q: s.chord.quality },
+        t: s.toolUsed, g: s.gesture, e: s.emotion, a: s.astralLevel,
+        d: s.durationBeats, v: s.voicing ? s.voicing.frets : null, l: s.lyric || ''
+      }))
+    };
+    return `${body}\n\n#CANINDE_META:${encodeMeta(JSON.stringify(payload))}\n`;
   }
 
   static fromHostSongContent(title: string, content: string, ownerId: string): Composition {
-    // Attempt reverse-importing: parse content and look for [HarmonyMetadata] fallback
-    const metadataMatch = content.match(/\[HarmonyMetadata:\s*(.*?)\]/);
     let slots: Slot[] = [];
+    let key: { tonic: PitchClass; mode: 'major' | 'minor' } = { tonic: 0, mode: 'major' };
+    let tempo: { bpm: number; timeSignature: [number, number] } = { bpm: 90, timeSignature: [4, 4] };
+    let defaultArticulation: 'strum' | 'arpeggio' = 'strum';
+    let rhythmPatternId = 'balada';
 
-    if (metadataMatch) {
+    // 1. Lossless restore from the namespaced base64 metadata block.
+    const metaMatch = content.match(/#CANINDE_META:([A-Za-z0-9+/=]+)/);
+    if (metaMatch) {
       try {
-        const rawArr = JSON.parse(metadataMatch[1]);
-        slots = rawArr.map((item: any, i: number) => ({
+        const payload = JSON.parse(decodeMeta(metaMatch[1]));
+        if (payload.key) key = payload.key;
+        if (payload.tempo) tempo = payload.tempo;
+        if (payload.defaultArticulation) defaultArticulation = payload.defaultArticulation;
+        if (payload.rhythmPatternId) rhythmPatternId = payload.rhythmPatternId;
+        slots = (payload.slots || []).map((item: any, i: number) => ({
           id: `slot_${Date.now()}_${i}`,
           chord: { root: item.c.r, quality: item.c.q },
           toolUsed: item.t,
@@ -689,61 +682,47 @@ export class SongExportAdapter {
           lyric: item.l
         }));
       } catch (e) {
-        console.error('Failed to restore slots from metadata, parsing chords manually', e);
+        console.error('Failed to restore harmony metadata', e);
       }
     }
 
+    // 2. Best-effort reconstruction from [chord] tokens (REQ-INT-04).
     if (slots.length === 0) {
-      // Reconstruct best-effort using chord scanner (REQ-INT-04)
-      const chordMatches = Array.from(content.matchAll(/\[(.*?)\]/g)).map(m => m[1]);
-      const uniqueChords = chordMatches.filter(c => !c.toLowerCase().includes('capo') && c.length <= 8);
-      
+      const tokens = Array.from(content.matchAll(/\[([^\]]+)\]/g)).map(m => m[1]);
       let prev: Chord | null = null;
-      uniqueChords.forEach((text, i) => {
-        const chordObj = parseChordString(text);
-        if (chordObj) {
-          let gest = null;
-          let emo = getDefaultEmotionFor(chordObj.quality);
-          let astral = getDefaultAstralFor(chordObj.quality);
-          
-          if (prev) {
-            const analysis = analyzeGesture(prev, chordObj);
-            gest = analysis.gesture;
-            emo = analysis.emotion;
-            astral = analysis.astral;
-          }
-          
-          slots.push({
-            id: `rebuild_${Date.now()}_${i}`,
-            chord: chordObj,
-            durationBeats: 4,
-            toolUsed: i === 0 ? 'free' : 'diatonic',
-            gesture: gest,
-            emotion: emo,
-            astralLevel: astral,
-            voicing: null
-          });
-          prev = chordObj;
+      tokens.forEach((tok, i) => {
+        const chordObj = parseChordString(tok);
+        if (!chordObj) return;
+        let gest: string | null = null;
+        let emo = getDefaultEmotionFor(chordObj.quality);
+        let astral = getDefaultAstralFor(chordObj.quality);
+        if (prev) {
+          const analysis = analyzeGesture(prev, chordObj);
+          gest = analysis.gesture;
+          emo = analysis.emotion;
+          astral = analysis.astral;
         }
+        slots.push({
+          id: `rebuild_${Date.now()}_${i}`,
+          chord: chordObj,
+          durationBeats: 4,
+          toolUsed: i === 0 ? 'free' : 'diatonic',
+          gesture: gest,
+          emotion: emo,
+          astralLevel: astral,
+          voicing: null
+        });
+        prev = chordObj;
       });
-    }
-
-    // Tonic parse
-    const keyMatch = content.match(/\[Key:\s*([A-Za-z#]+)\s*([a-z]+)?\]/i);
-    let tonic = 0;
-    let mode: 'major' | 'minor' = 'minor';
-    if (keyMatch) {
-      tonic = parsePitchClass(keyMatch[1]);
-      mode = (keyMatch[2] || '').toLowerCase().includes('minor') ? 'minor' : 'major';
     }
 
     return {
       id: `comp_${Date.now()}`,
       title: title || 'Composición Reconstruida',
-      key: { tonic, mode },
-      tempo: { bpm: 90, timeSignature: [4, 4] },
-      defaultArticulation: 'strum',
-      rhythmPatternId: 'balada',
+      key,
+      tempo,
+      defaultArticulation,
+      rhythmPatternId,
       instrument: 'guitar',
       slots,
       meta: {
@@ -754,6 +733,14 @@ export class SongExportAdapter {
       }
     };
   }
+}
+
+// Base64 (de)serialization for the namespaced metadata block. Unicode-safe.
+function encodeMeta(s: string): string {
+  try { return btoa(encodeURIComponent(s)); } catch { return ''; }
+}
+function decodeMeta(b64: string): string {
+  return decodeURIComponent(atob(b64));
 }
 
 // Helpers for string chord translation

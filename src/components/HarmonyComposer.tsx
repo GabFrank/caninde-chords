@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Play, Square, Plus, Trash2, Copy, Sparkles, AlertCircle, Compass, HelpCircle, ArrowUpRight, ArrowDownRight, RefreshCw, Save, FileSpreadsheet, Eye, Music, Edit2, Volume2, ArrowLeft, ArrowRight, ChevronDown, Check } from 'lucide-react';
-import { PitchClass, Quality, Chord, Tool, Slot, Composition, getCandidates, computePhase, analyzeGesture, getChordString, getPitchClassName, SongExportAdapter, mod12, parsePitchClass } from '../lib/harmonyEngine';
+import { PitchClass, Quality, Chord, Tool, Slot, Composition, getCandidates, computePhase, analyzeGesture, getChordString, getPitchClassName, getDefaultAstralFor, SongExportAdapter, mod12, parsePitchClass } from '../lib/harmonyEngine';
 import { audioEngine, getVoicingForChord } from '../services/audioEngine';
 import { db, auth } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, where, onSnapshot } from 'firebase/firestore';
@@ -59,6 +59,8 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
   const [selectedCompId, setSelectedCompId] = useState<string | null>(null);
   const [activePlaySlotIdx, setActivePlaySlotIdx] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLooping, setIsLooping] = useState(false);
+  const isLoopingRef = useRef(false);
 
   // Editor states
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -173,7 +175,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
         toolUsed: 'free',
         gesture: 'Punto de partida',
         emotion: 'libre',
-        astralLevel: 1,
+        astralLevel: getDefaultAstralFor(firstChord.quality), // REQ-DAT-02: astral por calidad
         voicing: getVoicingForChord(firstChord)
       };
       updateCurrentComp({ slots: [newSlot] });
@@ -228,9 +230,15 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
   const handlePreviewCandidate = (cand: any, e: React.MouseEvent) => {
     e.stopPropagation();
     audioEngine.init();
-    audioEngine.scheduleChord(getVoicingForChord(cand.chord), 0, {
-      articulation: currentComp?.defaultArticulation || 'strum'
-    });
+    const art = currentComp?.defaultArticulation || 'strum';
+    // REQ-CMP-04: oír la transición en contexto (acorde anterior -> candidato)
+    const lastSlot = currentComp?.slots[currentComp.slots.length - 1];
+    if (lastSlot) {
+      audioEngine.scheduleChord(lastSlot.voicing || getVoicingForChord(lastSlot.chord), 0, { articulation: art });
+      audioEngine.scheduleChord(getVoicingForChord(cand.chord), 0.85, { articulation: art });
+    } else {
+      audioEngine.scheduleChord(getVoicingForChord(cand.chord), 0, { articulation: art });
+    }
   };
 
   // Slot manipulations inside the timeline (REQ-CMP-06)
@@ -288,6 +296,18 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
     updateCurrentComp({ slots: recalculated });
   };
 
+  // REQ-CMP-06: editar duración (cicla 2 -> 4 -> 8 beats)
+  const handleCycleDuration = (idx: number) => {
+    if (!currentComp) return;
+    const cycle = [2, 4, 8];
+    const nextSlots = currentComp.slots.map((s, i) => {
+      if (i !== idx) return s;
+      const next = cycle[(cycle.indexOf(s.durationBeats) + 1) % cycle.length] ?? 4;
+      return { ...s, durationBeats: next };
+    });
+    updateCurrentComp({ slots: nextSlots });
+  };
+
   const handleSaveLyrics = () => {
     if (editSlotIdx === null || !currentComp) return;
     const nextSlots = [...currentComp.slots];
@@ -308,6 +328,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
     }
 
     setIsPlaying(true);
+    isLoopingRef.current = isLooping;
     playIdxRef.current = 0;
     setActivePlaySlotIdx(0);
     
@@ -316,11 +337,16 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
     const msPerBeat = (60 / bpm) * 1000;
 
     const playNext = () => {
-      const idx = playIdxRef.current;
+      let idx = playIdxRef.current;
       if (!currentComp || idx >= currentComp.slots.length) {
-        // Complete or Loop
-        handleStopComposition();
-        return;
+        if (isLoopingRef.current && currentComp && currentComp.slots.length > 0) {
+          // REQ-CMP-07: loop opcional
+          idx = 0;
+          playIdxRef.current = 0;
+        } else {
+          handleStopComposition();
+          return;
+        }
       }
 
       const slot = currentComp.slots[idx];
@@ -426,6 +452,13 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
               >
                 {isPlaying ? <Square size={14} /> : <Play size={14} />}
                 {isPlaying ? 'Detener' : 'Reproducir'}
+              </button>
+              <button
+                onClick={() => { setIsLooping(v => { isLoopingRef.current = !v; return !v; }); }}
+                className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all border ${isLooping ? 'bg-blue-600 text-white border-blue-600' : 'bg-transparent text-zinc-500 border-zinc-200 dark:border-zinc-700'}`}
+                title="Repetir en bucle"
+              >
+                <RefreshCw size={14} /> Loop
               </button>
             </div>
 
@@ -555,9 +588,13 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
 
                         {/* Footer stats: quality, tool and astral lvl */}
                         <div className="border-t border-zinc-100 dark:border-zinc-800 pt-2 flex justify-between items-center bg-transparent">
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500`}>
+                          <button
+                            onClick={() => handleCycleDuration(i)}
+                            title="Cambiar duración"
+                            className="text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                          >
                             {slot.durationBeats} beats
-                          </span>
+                          </button>
                           
                           <span className="text-[10px] font-bold font-mono text-zinc-500" title="Nivel Astral">
                             ✨ {slot.astralLevel}
@@ -729,6 +766,9 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest font-mono">
                       Acordes Candidatos ({getWizardCandidates().length})
                     </p>
+                    <p className="text-[10px] text-zinc-400 italic flex items-center gap-1">
+                      <HelpCircle size={11} /> Las emociones son tendencias, no garantías: una guía, no una regla.
+                    </p>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {getWizardCandidates().map((cand, idx) => {
@@ -757,13 +797,15 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                               {cand.rationale}
                             </p>
 
-                            <div className="flex justify-between items-center border-t border-zinc-100 dark:border-zinc-800 pt-2.5 bg-transparent">
+                            <div className="flex justify-between items-center border-t border-zinc-100 dark:border-zinc-800 pt-2.5 bg-transparent gap-1">
                               {cand.role && (
-                                <span className="text-[9px] font-bold font-mono text-zinc-400">
+                                <span className="text-[9px] font-bold font-mono text-zinc-400 truncate">
                                   {cand.role}
                                 </span>
                               )}
-                              <span className="text-[10px] ml-auto font-mono text-zinc-400">
+                              <span className="text-[10px] ml-auto font-mono text-zinc-400 flex items-center gap-1">
+                                {cand.direction === 'up' && <ArrowUpRight size={11} className="text-green-500" />}
+                                {cand.direction === 'down' && <ArrowDownRight size={11} className="text-amber-500" />}
                                 ✨ {cand.astralLevel}
                               </span>
                             </div>
