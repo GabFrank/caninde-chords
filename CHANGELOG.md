@@ -1,3 +1,10 @@
+# [2.6.0](https://github.com/GabFrank/caninde-chords/compare/v2.5.0...v2.6.0) (2026-06-07)
+
+
+### Features
+
+* **i18n:** infraestructura es/en y Compositor bilingüe (REQ-NFR-04) ([6df4383](https://github.com/GabFrank/caninde-chords/commit/6df4383dc478c43cb709a5b4df2ad303d84cd4ed))
+
 # [2.5.0](https://github.com/GabFrank/caninde-chords/compare/v2.4.0...v2.5.0) (2026-06-07)
 
 
