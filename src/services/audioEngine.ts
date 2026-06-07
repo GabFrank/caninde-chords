@@ -156,6 +156,10 @@ export class BaseAudioEngine {
   private activeSources: { source: AudioBufferSourceNode; gain: GainNode }[] = [];
   private droneSource: OscillatorNode | null = null;
   private droneGain: GainNode | null = null;
+  // Real sampled guitar (SoundFont). Loaded lazily; synthesis is the fallback.
+  private sf: any = null;
+  private sfReady = false;
+  private sfLoading = false;
 
   constructor() {
     // Lazy initialized when first trigger occurs (to satisfy browser permissions)
@@ -173,21 +177,21 @@ export class BaseAudioEngine {
       // harsh/shrill fizz, without muffling the instrument.
       const lowShelf = this.ctx.createBiquadFilter();
       lowShelf.type = 'lowshelf';
-      lowShelf.frequency.value = 200;
-      lowShelf.gain.value = 3.0; // subtle wood warmth
+      lowShelf.frequency.value = 180;
+      lowShelf.gain.value = 2.5; // subtle wood warmth
 
-      // Tame nasal/harsh upper-mids a touch (the main source of "chillón")
+      // Gently tame only the harshest upper-mids (avoid making it dull)
       const presenceDip = this.ctx.createBiquadFilter();
       presenceDip.type = 'peaking';
-      presenceDip.frequency.value = 2600;
+      presenceDip.frequency.value = 3200;
       presenceDip.Q.value = 1.0;
-      presenceDip.gain.value = -4.5;
+      presenceDip.gain.value = -1.5;
 
-      // Gentle low-pass to smooth the very top end (12 dB/oct, soft Q)
+      // Very gentle low-pass: only shaves off ultrasonic fizz, keeps brightness
       const highCut = this.ctx.createBiquadFilter();
       highCut.type = 'lowpass';
-      highCut.frequency.value = 5200;
-      highCut.Q.value = 0.5;
+      highCut.frequency.value = 8500;
+      highCut.Q.value = 0.4;
 
       // Dry chain
       this.masterVolumeNode.connect(lowShelf);
@@ -205,9 +209,36 @@ export class BaseAudioEngine {
       convolver.connect(wet);
       wet.connect(this.ctx.destination);
 
+      // Begin loading the real sampled guitar in the background.
+      this.loadSoundfont();
+
     } catch (e) {
       console.error('Failed to initialize AudioContext with acoustic processing', e);
     }
+  }
+
+  // Lazily loads a real recorded acoustic-guitar SoundFont. Samples are cached by
+  // the PWA service worker, so it keeps working offline after the first load.
+  private loadSoundfont() {
+    if (this.sfLoading || this.sfReady || !this.ctx || !this.masterVolumeNode) return;
+    this.sfLoading = true;
+    import('soundfont-player')
+      .then((mod: any) => {
+        const Soundfont = mod.default || mod;
+        return Soundfont.instrument(this.ctx, 'acoustic_guitar_steel', {
+          soundfont: 'MusyngKite',
+          destination: this.masterVolumeNode
+        });
+      })
+      .then((inst: any) => {
+        this.sf = inst;
+        this.sfReady = true;
+        this.sfLoading = false;
+      })
+      .catch((e: any) => {
+        console.warn('SoundFont de guitarra no disponible; usando síntesis.', e);
+        this.sfLoading = false;
+      });
   }
 
   // Builds a smooth, lowpassed exponential-decay impulse response for a natural reverb tail.
@@ -306,7 +337,20 @@ export class BaseAudioEngine {
     const now = this.ctx.currentTime;
     // Treat as relative offset if time is far in the past of the actual context timeline
     const absoluteTime = time < (now - 0.5) ? now + time : time;
-    
+
+    // Prefer the real sampled guitar when it's ready; otherwise kick off loading
+    // and fall back to synthesis so there is never silence.
+    if (this.sfReady && this.sf) {
+      try {
+        this.sf.play(midiNote, absoluteTime, { gain: Math.max(0.05, Math.min(1, velocity)) });
+        return;
+      } catch (e) {
+        // fall through to synthesis on any sampler error
+      }
+    } else {
+      this.loadSoundfont();
+    }
+
     const buffer = this.getPluckedStringBuffer(midiNote);
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
@@ -476,6 +520,9 @@ export class BaseAudioEngine {
   }
 
   stopAll() {
+    if (this.sf) {
+      try { this.sf.stop(); } catch (e) {}
+    }
     this.activeSources.forEach(s => {
       try {
         s.source.stop();

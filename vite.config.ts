@@ -34,6 +34,19 @@ export default defineConfig(({mode}) => {
           // version.json nunca se cachea ni se sirve como index.html: siempre va a la red.
           globIgnores: ['**/node_modules/**/*', '**/version.json'],
           navigateFallbackDenylist: [/^\/version\.json$/],
+          // Cachea los samples del SoundFont de guitarra para que funcione offline
+          // tras la primera carga.
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/gleitz\.github\.io\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'guitar-soundfont',
+                expiration: { maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheableResponse: { statuses: [0, 200] }
+              }
+            }
+          ],
         },
         manifest: {
           name: 'CanindeChords',
