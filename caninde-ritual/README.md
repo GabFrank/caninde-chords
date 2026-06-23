@@ -6,10 +6,15 @@ CanindéChords: vive en el mismo repo, comparte sus convenciones (Vite + React 1
 TypeScript + Tailwind v4 + Firebase), pero es una app independiente con su propio
 build y su propio target de Firebase Hosting.
 
-> Estado: **Fase 0 — Fundaciones**. El núcleo `ritual-core` está implementado (modelo,
-> motor de generación, puertos de reproducción y auth OAuth/PKCE), con tests. Las fases
-> de UI, persistencia, runtime de reproducción y deploy llegan después (ver doc de
-> implementación).
+> Estado: **Fase 1 — Núcleo cerrado**. `ritual-core` está implementado y cubierto por
+> tests (modelo + validación, scoring con pesos configurables, motor de generación,
+> transiciones, armonía Camelot/mod-12 y auth OAuth/PKCE con refresh). Genera una
+> secuencia válida que respeta duración, anclas, silencios y clima, reproducible por
+> semilla. Las fases de persistencia (Fase 2), UI, runtime de reproducción y deploy
+> llegan después (ver doc de implementación).
+>
+> **Próximo paso acordado**: la app se crea en Google AI Studio y se sube como su
+> propio repo; `ritual-core` se migra ahí y la Fase 2 se construye sobre ese shell.
 
 ## Estructura
 

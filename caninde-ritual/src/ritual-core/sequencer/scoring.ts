@@ -9,11 +9,21 @@ import { valueFor } from '../model/attributes';
 import type { Track } from '../model/track';
 import { harmonicCompatibility } from './harmonic';
 
-export const WEIGHTS = {
+export interface ScoreWeights {
+  /** Qué tan bien las emociones del track caen en el clima pedido. */
+  emotional: number;
+  /** Calidad del empalme con el anterior (armonía + tempo, ocultos). */
+  transition: number;
+  /** Penaliza temas usados recientemente. */
+  novelty: number;
+}
+
+/** Pesos por defecto del doc §6. Configurables al generar para afinarlos. */
+export const DEFAULT_WEIGHTS: ScoreWeights = {
   emotional: 0.6,
   transition: 0.3,
   novelty: 0.1,
-} as const;
+};
 
 /**
  * Qué tan bien el track cae en el clima emocional pedido (0..1).
@@ -93,16 +103,29 @@ export interface ScoreContext {
   recent: string[];
   targets: AttributeTarget[];
   defs: Map<string, AttributeDefinition>;
+  /** Pesos a usar; por defecto `DEFAULT_WEIGHTS`. */
+  weights?: ScoreWeights;
+}
+
+/** Detalle del puntaje, útil para depurar el afinado de pesos (no se muestra al usuario). */
+export interface ScoreBreakdown {
+  emotional: number;
+  transition: number;
+  novelty: number;
+  total: number;
+}
+
+/** Puntaje desglosado de un candidato combinando los tres factores. */
+export function scoreBreakdown(candidate: Track, ctx: ScoreContext): ScoreBreakdown {
+  const w = ctx.weights ?? DEFAULT_WEIGHTS;
+  const emotional = emotionalFit(candidate, ctx.targets, ctx.defs);
+  const transition = transitionFit(ctx.prev, candidate);
+  const novelty = noveltyScore(candidate.id, ctx.recent);
+  const total = w.emotional * emotional + w.transition * transition + w.novelty * novelty;
+  return { emotional, transition, novelty, total };
 }
 
 /** Puntaje total de un candidato combinando los tres factores. */
 export function scoreCandidate(candidate: Track, ctx: ScoreContext): number {
-  const emotional = emotionalFit(candidate, ctx.targets, ctx.defs);
-  const transition = transitionFit(ctx.prev, candidate);
-  const novelty = noveltyScore(candidate.id, ctx.recent);
-  return (
-    WEIGHTS.emotional * emotional +
-    WEIGHTS.transition * transition +
-    WEIGHTS.novelty * novelty
-  );
+  return scoreBreakdown(candidate, ctx).total;
 }

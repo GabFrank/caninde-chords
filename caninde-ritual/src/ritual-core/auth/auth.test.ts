@@ -94,4 +94,37 @@ describe('exchange + session (fetch inyectado)', () => {
     await session.logout();
     expect(await session.isLoggedIn()).toBe(false);
   });
+
+  it('getAccessToken refresca cuando el token está vencido', async () => {
+    const store = new InMemoryTokenStore();
+    // Token ya vencido pero con refresh token.
+    await store.set('spotify', {
+      accessToken: 'VIEJO',
+      tokenType: 'Bearer',
+      expiresAt: Date.now() - 1000,
+      refreshToken: 'R-OLD',
+    });
+
+    let refreshCalled = false;
+    const refreshingFetch = async (_url: string, init: RequestInit): Promise<Response> => {
+      const body = String(init.body);
+      expect(body).toContain('grant_type=refresh_token');
+      refreshCalled = true;
+      return new Response(
+        JSON.stringify({ access_token: 'NUEVO', token_type: 'Bearer', expires_in: 3600 }),
+        { status: 200 },
+      );
+    };
+
+    const session = new AuthSession(config, store, refreshingFetch);
+    expect(await session.getAccessToken()).toBe('NUEVO');
+    expect(refreshCalled).toBe(true);
+    // Conserva el refresh token previo si el proveedor no manda uno nuevo.
+    expect((await store.get('spotify'))?.refreshToken).toBe('R-OLD');
+  });
+
+  it('getAccessToken sin sesión lanza error claro', async () => {
+    const session = new AuthSession(config, new InMemoryTokenStore(), fakeFetch);
+    await expect(session.getAccessToken()).rejects.toThrow(/login/i);
+  });
 });

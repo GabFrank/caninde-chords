@@ -15,7 +15,7 @@ import type { FixedAnchor, RitualTemplate } from '../model/template';
 import { regionAt } from '../model/template';
 import type { GeneratedSequence, SequenceElement } from '../model/sequence';
 import { makeRng, pickWeighted, type Rng } from './rng';
-import { scoreCandidate } from './scoring';
+import { DEFAULT_WEIGHTS, scoreCandidate, type ScoreWeights } from './scoring';
 import { planTransition } from './transitions';
 
 export interface GenerateOptions {
@@ -23,6 +23,8 @@ export interface GenerateOptions {
   seed?: number;
   /** Temperatura del azar controlado (0 = codicioso, alto = explorador). */
   temperature?: number;
+  /** Pesos del scoring (emotional/transition/novelty). Por defecto los del doc §6. */
+  weights?: Partial<ScoreWeights>;
 }
 
 const EPS_MS = 500;
@@ -43,6 +45,7 @@ export function generate(
 ): GeneratedSequence {
   const seed = options.seed ?? 1;
   const temperature = options.temperature ?? 0.4;
+  const weights: ScoreWeights = { ...DEFAULT_WEIGHTS, ...options.weights };
   const rng = makeRng(seed);
   const total = template.totalDurationMs;
   const ambientAvailable = !!template.ambient?.enabled;
@@ -105,7 +108,7 @@ export function generate(
       const region = regionAt(template.regions, t);
       const candidate = pickCandidate(
         library,
-        { prev, recent, targets: region?.targets ?? [], defs },
+        { prev, recent, targets: region?.targets ?? [], defs, weights },
         lastTrackId,
         temperature,
         rng,
