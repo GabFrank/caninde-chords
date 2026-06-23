@@ -97,8 +97,10 @@ export function generate(
     recent.unshift(track.id);
   };
 
-  // Rellena con temas hasta acercarse a `limitMs` sin pasarse.
-  const fillUntil = (limitMs: number): void => {
+  // Rellena con temas hasta acercarse a `limitMs` sin pasarse. `excludeNextId` evita
+  // que el último relleno coincida con el ancla que viene justo después (sería un
+  // "dos veces seguidas" al colocarla).
+  const fillUntil = (limitMs: number, excludeNextId?: string): void => {
     while (true) {
       insertDueSilences();
       const remaining = limitMs - cursor;
@@ -109,7 +111,7 @@ export function generate(
       const candidate = pickCandidate(
         library,
         { prev, recent, targets: region?.targets ?? [], defs, weights },
-        lastTrackId,
+        [lastTrackId, excludeNextId],
         temperature,
         rng,
       );
@@ -126,7 +128,7 @@ export function generate(
 
   // Relleno por tramos: antes de cada ancla, hasta su inicio objetivo; luego el ancla.
   for (const a of anchors) {
-    fillUntil(a.startTarget);
+    fillUntil(a.startTarget, a.track.id);
     insertDueSilences();
     // Las anclas son OBLIGATORIAS: van con su duración completa (sin recortar).
     placeTrack(a.track, a.track.durationMs);
@@ -154,12 +156,14 @@ export function generate(
 function pickCandidate(
   library: Track[],
   ctx: Parameters<typeof scoreCandidate>[1],
-  excludeId: string | undefined,
+  excludeIds: Array<string | undefined>,
   temperature: number,
   rng: Rng,
 ): Track | undefined {
-  // Regla dura: nunca el mismo tema dos veces seguidas (ni a través de un silencio).
-  const candidates = library.filter((track) => track.id !== excludeId);
+  // Regla dura: nunca el mismo tema dos veces seguidas (ni a través de un silencio,
+  // ni como relleno pegado a un ancla idéntica).
+  const banned = new Set(excludeIds.filter((id): id is string => !!id));
+  const candidates = library.filter((track) => !banned.has(track.id));
   if (candidates.length === 0) return undefined;
   const scores = candidates.map((c) => scoreCandidate(c, ctx));
   const idx = pickWeighted(scores, temperature, rng);

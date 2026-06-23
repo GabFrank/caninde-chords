@@ -218,3 +218,76 @@ export const SEED_AYAHUASCA_TEMPLATE: RitualTemplate = {
   ],
   ambient: { enabled: true, trackId: NATURE_TRACK_ID, baseVolume: 0.2 },
 };
+
+// --- Plantilla de rapé (~30min): corta e intensa. Subida rápida a un pico breve,
+//     un silencio de quietud tras el soplo, y aterrizaje a tierra. ---
+export const SEED_RAPE_TEMPLATE: RitualTemplate = {
+  id: 'rape-soplo',
+  name: 'Rapé — Soplo y Tierra (~30min)',
+  totalDurationMs: 30 * MIN,
+  curve: [
+    { t: 0, energy: 0.15 },
+    { t: 0.18, energy: 0.5 },
+    { t: 0.3, energy: 0.95 },
+    { t: 0.45, energy: 0.55 },
+    { t: 0.7, energy: 0.35 },
+    { t: 1, energy: 0.1 },
+  ],
+  regions: [
+    {
+      id: 'preparacion',
+      name: 'Preparación',
+      startT: 0,
+      endT: 0.18,
+      targets: [
+        { defId: 'calm', weight: 1, min: 7, max: 10 },
+        { defId: 'depth', weight: 0.5, min: 4, max: 8 },
+        { defId: 'moment', weight: 0.4, equals: 'apertura' },
+      ],
+    },
+    {
+      id: 'soplo',
+      name: 'Soplo',
+      startT: 0.18,
+      endT: 0.45,
+      targets: [
+        { defId: 'energy', weight: 1, min: 8, max: 10 },
+        { defId: 'tension', weight: 0.8, min: 6, max: 10 },
+        { defId: 'moment', weight: 0.4, equals: 'pico' },
+      ],
+    },
+    {
+      id: 'integracion',
+      name: 'Integración',
+      startT: 0.45,
+      endT: 0.78,
+      targets: [
+        { defId: 'depth', weight: 0.9, min: 6, max: 10 },
+        { defId: 'calm', weight: 0.7, min: 5, max: 9 },
+        { defId: 'energy', weight: 0.5, min: 2, max: 5 },
+      ],
+    },
+    {
+      id: 'tierra',
+      name: 'Tierra',
+      startT: 0.78,
+      endT: 1,
+      targets: [
+        { defId: 'calm', weight: 1, min: 8, max: 10 },
+        { defId: 'moment', weight: 0.5, equals: 'cierre' },
+      ],
+    },
+  ],
+  anchors: [
+    { id: 'r-apertura', trackId: 'icaro-apertura', placement: { type: 'region', regionId: 'preparacion', position: 'start' } },
+    { id: 'r-soplo', trackId: 'fuego-interior', placement: { type: 'region', regionId: 'soplo', position: 'any' } },
+    { id: 'r-tierra', trackId: 'cierre-tierra', placement: { type: 'region', regionId: 'tierra', position: 'end' } },
+  ],
+  silences: [
+    { id: 's-post-soplo', t: 0.46, durationMs: 90_000 }, // quietud tras el soplo
+  ],
+  ambient: { enabled: true, trackId: NATURE_TRACK_ID, baseVolume: 0.25 },
+};
+
+/** Todas las plantillas semilla disponibles. */
+export const SEED_TEMPLATES: RitualTemplate[] = [SEED_AYAHUASCA_TEMPLATE, SEED_RAPE_TEMPLATE];
