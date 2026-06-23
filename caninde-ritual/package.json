@@ -1,0 +1,41 @@
+{
+  "name": "caninde-ritual",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Curaduría y orquestación musical para meditaciones y ceremonias con medicinas sagradas. App hermana de CanindéChords.",
+  "scripts": {
+    "dev": "vite --port=3001 --host=0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo:run": "tsx src/ritual-core/demo/run.ts",
+    "demo:auth": "tsx src/ritual-core/demo/auth.ts"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-react": "^5.0.4",
+    "clsx": "^2.1.1",
+    "firebase": "^12.11.0",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.38.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.13.2",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.1.14",
+    "vite": "^6.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^4.1.8"
+  }
+}

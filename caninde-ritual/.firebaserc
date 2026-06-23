@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "franco-control"
+  },
+  "targets": {
+    "franco-control": {
+      "hosting": {
+        "caninde-ritual": [
+          "caninde-ritual"
+        ]
+      }
+    }
+  }
+}
