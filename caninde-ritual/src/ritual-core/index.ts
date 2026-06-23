@@ -7,3 +7,4 @@ export * from './model';
 export * from './sequencer';
 export * from './playback';
 export * from './auth';
+export * from './persistence';
