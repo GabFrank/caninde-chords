@@ -1,3 +1,10 @@
+## [2.12.1](https://github.com/GabFrank/caninde-chords/compare/v2.12.0...v2.12.1) (2026-08-01)
+
+
+### Bug Fixes
+
+* **ui:** mostrar la lista siempre en móvil con colapsar/reabrir ([#2](https://github.com/GabFrank/caninde-chords/issues/2)) ([0b7a580](https://github.com/GabFrank/caninde-chords/commit/0b7a5803019bb51f6fc393a0c871d16261ea83d9))
+
 # [2.12.0](https://github.com/GabFrank/caninde-chords/compare/v2.11.0...v2.12.0) (2026-06-07)
 
 
