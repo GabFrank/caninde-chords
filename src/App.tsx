@@ -1335,6 +1335,11 @@ export default function App() {
     );
   }
 
+  // En móvil funcionamos como maestro-detalle: se ve la LISTA o el contenido.
+  // La lista está visible mientras no haya nada seleccionado (navegando) o
+  // mientras el usuario la mantenga abierta con `showMobileSidebar`.
+  const showListOnMobile = activeTab !== 'utilities' && ((!selectedSong && !selectedSetlist) || showMobileSidebar);
+
   return (
     <div className={`fixed inset-0 flex flex-col overflow-hidden ${isDarkMode ? 'dark bg-zinc-950 text-white' : 'bg-zinc-50 text-zinc-900'} transition-colors duration-300`}>
       
@@ -1364,11 +1369,11 @@ export default function App() {
           {selectedSetlist && (
             <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-1.5 md:px-2.5 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700 mx-2 md:mx-4 overflow-hidden max-w-[140px] sm:max-w-sm lg:max-w-md h-8">
               {/* Mobile Sidebar Toggle - Only if not forced by preferences */}
-              {isMobile && !(profile?.alwaysShowSidebar ?? true) && (
-                <button 
-                  onClick={() => setShowMobileSidebar(!showMobileSidebar)}
+              {isMobile && !showMobileSidebar && (
+                <button
+                  onClick={() => setShowMobileSidebar(true)}
                   className="p-1 rounded-md transition-colors text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-                  title="Mostrar Lista"
+                  title={t.songs}
                 >
                   <List size={16} />
                 </button>
@@ -1484,12 +1489,12 @@ export default function App() {
           </header>
         )}
 
-        <main className={`flex-1 min-h-0 flex ${((isMobile && isPortrait) || (isMobile && !(profile?.alwaysShowSidebar ?? true))) ? 'flex-col' : 'flex-row'} ${sidebarPosition === 'right' ? 'flex-row-reverse' : ''} overflow-hidden relative`}>
+        <main className={`flex-1 min-h-0 flex ${isMobile ? 'flex-col' : 'flex-row'} ${sidebarPosition === 'right' ? 'flex-row-reverse' : ''} overflow-hidden relative`}>
           
           {/* Sidebar / List */}
           <div 
-            style={{ width: (!isMobile || (profile?.alwaysShowSidebar ?? true)) && !(isMobile && isPortrait) ? `${sidebarWidth}%` : '100%' }}
-            className={`${(!isMobile || (profile?.alwaysShowSidebar ?? true)) && !(isMobile && isPortrait) ? 'flex-shrink-0' : 'flex-1 min-h-0'} border-zinc-200 dark:border-zinc-800 flex flex-col ${sidebarPosition === 'left' ? 'border-r' : 'border-l'} ${(isFullScreen || isEditing || (isMobile && isPortrait && (selectedSong || selectedSetlist || activeTab === 'utilities'))) ? 'hidden md:flex' : ((selectedSong || selectedSetlist) && !showMobileSidebar && !((isMobile && isPortrait) || (profile?.alwaysShowSidebar ?? true))) ? 'hidden md:flex' : 'flex'}`}
+            style={{ width: isMobile ? '100%' : `${sidebarWidth}%` }}
+            className={`${isMobile ? 'flex-1 min-h-0' : 'flex-shrink-0'} border-zinc-200 dark:border-zinc-800 flex flex-col ${sidebarPosition === 'left' ? 'border-r' : 'border-l'} ${(isFullScreen || isEditing) ? 'hidden md:flex' : (isMobile && !showListOnMobile) ? 'hidden' : 'flex'}`}
           >
             {selectedSetlist ? (
               <div className="flex flex-col h-full overflow-hidden">
@@ -1508,7 +1513,14 @@ export default function App() {
                   </div>
 
                   <div className="flex items-center gap-0.5">
-                    <button 
+                    <button
+                      onClick={() => setShowMobileSidebar(false)}
+                      className="md:hidden p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
+                      title={t.back}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
                       onClick={() => setIsEditing(true)}
                       className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
                       title={t.edit}
@@ -1705,11 +1717,11 @@ export default function App() {
                         <button
                           key={setlist.id}
                           onClick={() => { 
-                            setSelectedSetlist(setlist); 
-                            setSelectedSong(null); 
-                            setCurrentSetlistIndex(0); 
-                            setIsEditing(false); 
-                            setShowMobileSidebar(false);
+                            setSelectedSetlist(setlist);
+                            setSelectedSong(null);
+                            setCurrentSetlistIndex(0);
+                            setIsEditing(false);
+                            setShowMobileSidebar(true);
                           }}
                           className={`w-full p-2 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSetlist?.id === setlist.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
                         >
@@ -1750,7 +1762,7 @@ export default function App() {
           </div>
 
           {/* Content Area */}
-          <div className={`flex-1 relative flex flex-col overflow-hidden ${(isFullScreen || isEditing || activeTab === 'utilities') ? 'flex' : (isMobile && (selectedSong || selectedSetlist) && showMobileSidebar && !(profile?.alwaysShowSidebar ?? true)) ? 'hidden' : (selectedSong || selectedSetlist) ? 'flex' : 'hidden md:flex'}`}>
+          <div className={`flex-1 relative flex flex-col overflow-hidden ${(isFullScreen || isEditing || activeTab === 'utilities') ? 'flex' : (isMobile && showListOnMobile) ? 'hidden' : (selectedSong || selectedSetlist) ? 'flex' : 'hidden md:flex'}`}>
             <AnimatePresence mode="wait">
               {activeTab === 'utilities' ? (
                 <motion.div
@@ -2358,25 +2370,6 @@ export default function App() {
                 </div>
                 <div className={`w-10 h-6 rounded-full transition-all relative ${(tempProfile?.showCapo ?? true) ? 'bg-blue-600' : 'bg-zinc-300'}`}>
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${(tempProfile?.showCapo ?? true) ? 'left-5' : 'left-1'}`} />
-                </div>
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">{t.alwaysShowSidebar}</label>
-              <button 
-                onClick={() => {
-                  setTempProfile(prev => ({ ...prev, alwaysShowSidebar: !(prev?.alwaysShowSidebar ?? true) }));
-                  setHasPendingProfileChanges(true);
-                }}
-                className="w-full py-3 px-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl flex items-center justify-between font-bold"
-              >
-                <div className="flex items-center gap-3">
-                  <Columns size={20} />
-                  <span>{t.alwaysShowSidebar}</span>
-                </div>
-                <div className={`w-10 h-6 rounded-full transition-all relative ${(tempProfile?.alwaysShowSidebar ?? true) ? 'bg-blue-600' : 'bg-zinc-300'}`}>
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${(tempProfile?.alwaysShowSidebar ?? true) ? 'left-5' : 'left-1'}`} />
                 </div>
               </button>
             </div>
