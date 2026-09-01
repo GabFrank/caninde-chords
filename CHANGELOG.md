@@ -1,3 +1,10 @@
+## [2.12.4](https://github.com/GabFrank/caninde-chords/compare/v2.12.3...v2.12.4) (2026-09-01)
+
+
+### Bug Fixes
+
+* **auth:** no quedar clavado en la pantalla de carga si el acceso no resuelve ([1a8c99c](https://github.com/GabFrank/caninde-chords/commit/1a8c99caede26f85ffe3e33aa6f4f98452bbb9a6))
+
 ## [2.12.3](https://github.com/GabFrank/caninde-chords/compare/v2.12.2...v2.12.3) (2026-09-01)
 
 
