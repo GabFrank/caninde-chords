@@ -119,7 +119,7 @@ export const SetlistEditor: React.FC<SetlistEditorProps> = ({ initialSetlist, av
           </button>
         </div>
 
-        <Reorder.Group axis="y" values={songIds} onReorder={setSongIds} className="space-y-8 pb-24">
+        <Reorder.Group axis="y" values={songIds} onReorder={setSongIds} className="space-y-2 pb-24">
           {songIds.map((id) => {
             const song = availableSongs.find(s => s.id === id);
             if (!song) return null;
@@ -198,7 +198,7 @@ export const SetlistEditor: React.FC<SetlistEditorProps> = ({ initialSetlist, av
                         <p className="font-bold truncate">{song.title}</p>
                         <p className="text-xs text-zinc-500 truncate">{song.artist}</p>
                       </div>
-                      <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity">
                         <Plus size={18} />
                       </div>
                     </button>

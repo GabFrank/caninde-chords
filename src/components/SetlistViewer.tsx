@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Song, Setlist, Session, UserSongSettings } from '../types';
 import { ChevronLeft, ChevronRight, List, Users, Radio, XCircle } from 'lucide-react';
 import { SongViewer } from './SongViewer';
@@ -45,6 +45,8 @@ interface SetlistViewerProps {
   t: any;
 }
 
+type SwipeStart = { x: number; y: number } | null;
+
 export const SetlistViewer: React.FC<SetlistViewerProps> = ({ 
   setlist, 
   songs, 
@@ -80,6 +82,7 @@ export const SetlistViewer: React.FC<SetlistViewerProps> = ({
 }) => {
   const { profile } = useAuth();
   const [showIndex, setShowIndex] = useState(false);
+  const swipeRef = useRef<SwipeStart>(null);
   const [showDirectorDialog, setShowDirectorDialog] = useState(false);
   
   // Sync internal state with external props if provided
@@ -551,7 +554,26 @@ export const SetlistViewer: React.FC<SetlistViewerProps> = ({
       )}
 
       {/* Song Content */}
-      <div className="flex-1 overflow-hidden relative">
+      <div
+        className="flex-1 overflow-hidden relative"
+        onTouchStart={(e) => {
+          const t0 = e.touches[0];
+          swipeRef.current = { x: t0.clientX, y: t0.clientY };
+        }}
+        onTouchEnd={(e) => {
+          const start = swipeRef.current;
+          swipeRef.current = null;
+          if (!start || (activeSession && !isDirector)) return;
+          const t1 = e.changedTouches[0];
+          const dx = t1.clientX - start.x;
+          const dy = t1.clientY - start.y;
+          // Sólo horizontal y con recorrido suficiente: el visor scrollea en
+          // vertical y no queremos robarle el gesto.
+          if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+          if (dx < 0 && currentIndex < setlistSongs.length - 1) onIndexChange(currentIndex + 1);
+          if (dx > 0 && currentIndex > 0) onIndexChange(currentIndex - 1);
+        }}
+      >
         {currentSong && (
           <SongViewer 
             song={currentSong} 
@@ -572,13 +594,16 @@ export const SetlistViewer: React.FC<SetlistViewerProps> = ({
           />
         )}
 
-        {/* Floating Navigation for Fullscreen - Now simplified or removed as per user preference if top bar works */}
-        {isFullScreen && (
+        {/* Navegación flotante. Antes vivía sólo en pantalla completa, así que en
+            ensayo (donde nadie usa fullscreen porque necesita la toolbar) el único
+            modo de pasar de canción era un chevron de 24px en la cabecera. */}
+        {setlistSongs.length > 1 && (
           <div className="absolute bottom-4 right-4 safe-area-x flex flex-col items-end gap-3 z-30">
             <div className="flex items-center gap-2">
               <button 
                 disabled={currentIndex === 0 || (activeSession && !isDirector)}
                 onClick={() => onIndexChange(currentIndex - 1)}
+                aria-label="Anterior"
                 className="p-4 bg-zinc-900/80 text-white rounded-full shadow-lg disabled:opacity-30 backdrop-blur-sm hover:bg-zinc-800 transition-all"
               >
                 <ChevronLeft size={24} />
@@ -589,6 +614,7 @@ export const SetlistViewer: React.FC<SetlistViewerProps> = ({
               <button 
                 disabled={currentIndex === setlistSongs.length - 1 || (activeSession && !isDirector)}
                 onClick={() => onIndexChange(currentIndex + 1)}
+                aria-label="Siguiente"
                 className="p-4 bg-zinc-900/80 text-white rounded-full shadow-lg disabled:opacity-30 backdrop-blur-sm hover:bg-zinc-800 transition-all"
               >
                 <ChevronRight size={24} />

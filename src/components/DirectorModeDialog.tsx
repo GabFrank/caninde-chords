@@ -322,7 +322,7 @@ export const DirectorModeDialog: React.FC<DirectorModeDialogProps> = ({
                             <p className="text-xs text-zinc-500">{session.directorId === user?.uid ? t.rejoinSession : t.beSpectator}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2 text-blue-600 opacity-60 group-hover:opacity-100 transition-opacity">
                           <span className="text-xs font-bold">{session.directorId === user?.uid ? t.rejoin : t.add}</span>
                           <LogIn size={18} />
                         </div>
@@ -338,7 +338,7 @@ export const DirectorModeDialog: React.FC<DirectorModeDialogProps> = ({
                               handleFirestoreError(error, OperationType.UPDATE, `sessions/${session.id}`);
                             }
                           }}
-                          className="absolute -top-2 -right-2 p-1.5 bg-red-600 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                          className="absolute -top-2 -right-2 p-1.5 bg-red-600 text-white rounded-full shadow-lg opacity-60 group-hover:opacity-100 transition-opacity hover:bg-red-700"
                           title={t.stopSession}
                         >
                           <X size={14} />

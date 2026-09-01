@@ -8,6 +8,24 @@
 }
 
 @layer base {
+  :root {
+    --cc-title: 0.9375rem;
+    --cc-meta:  0.8125rem;
+    --cc-ui:    0.875rem;
+    --cc-ui-sm: 0.75rem;
+  }
+  [data-mode="regular"] {
+    --cc-title: 1rem;
+    --cc-meta:  0.875rem;
+    --cc-ui:    0.9375rem;
+    --cc-ui-sm: 0.8125rem;
+  }
+  [data-mode="desktop"] {
+    --cc-title: 1.0625rem;
+    --cc-meta:  0.9375rem;
+    --cc-ui:    1rem;
+    --cc-ui-sm: 0.8125rem;
+  }
   html, body, #root {
     height: 100%;
     height: 100vh;
@@ -20,13 +38,35 @@
     user-select: none;
     overscroll-behavior-y: contain;
   }
-  input, textarea {
+  input, textarea, .selectable-text {
     user-select: text;
+    -webkit-user-select: text;
   }
 }
 
 :fullscreen {
   background-color: black;
+}
+
+/* Escala de la interfaz. Se conmuta por modo de layout en vez de por `vw`:
+   `vw` mide la ventana, no el contenedor, así que en un monitor grande le daba
+   la fuente máxima a un panel angosto y la mínima a un teléfono donde la lista
+   ocupa el ancho completo. */
+@utility t-title {
+  font-size: var(--cc-title, 0.9375rem);
+  line-height: 1.35;
+}
+@utility t-meta {
+  font-size: var(--cc-meta, 0.8125rem);
+  line-height: 1.35;
+}
+@utility t-ui {
+  font-size: var(--cc-ui, 0.875rem);
+  line-height: 1.4;
+}
+@utility t-ui-sm {
+  font-size: var(--cc-ui-sm, 0.75rem);
+  line-height: 1.3;
 }
 
 @layer utilities {

@@ -168,7 +168,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
     <div className="w-full h-full relative overflow-hidden flex flex-col">
       <div 
         ref={containerRef}
-        className={`flex-1 touch-scrolling p-1 md:p-2 ${isFullscreen ? 'p-0.5 md:p-1' : ''} overflow-y-auto overflow-x-hidden`}
+        className={`selectable-text flex-1 touch-scrolling p-1 md:p-2 ${isFullscreen ? 'p-0.5 md:p-1' : ''} overflow-y-auto overflow-x-hidden`}
         style={{ fontSize: `${currentFontSize}px` }}
       >
         <div ref={headerRef} className="mb-1 flex justify-between items-start shrink-0">

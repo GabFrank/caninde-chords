@@ -27,6 +27,15 @@ const Modal: React.FC<{
   title: string; 
   children: React.ReactNode;
 }> = ({ isOpen, onClose, title, children }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -37,7 +46,7 @@ const Modal: React.FC<{
       >
         <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center shrink-0">
           <h3 className="text-xl font-bold">{title}</h3>
-          <button onClick={onClose} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
+          <button onClick={onClose} aria-label="Cerrar" className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -75,7 +84,23 @@ export default function App() {
   const [selectedSetlist, setSelectedSetlist] = useState<Setlist | null>(null);
   const [currentSetlistIndex, setCurrentSetlistIndex] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem('cc:theme');
+      if (saved) return saved === 'dark';
+    } catch {
+      // Sin almacenamiento se usa el valor por defecto.
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('cc:theme', isDarkMode ? 'dark' : 'light');
+    } catch {
+      // idem
+    }
+  }, [isDarkMode]);
   const [fontSize, setFontSize] = useState(16);
   const [columns, setColumns] = useState(1);
   const [transpose, setTranspose] = useState(0);
@@ -1423,10 +1448,39 @@ export default function App() {
     setListVisible(false);
   }, [mode]);
 
+  const canNavigateSetlist = Boolean(selectedSetlist) && !(activeSession && !isDirector);
+  const songCount = selectedSetlist?.songIds.length ?? 0;
+
+  const goPrevSong = React.useCallback(() => {
+    setCurrentSetlistIndex(prev => Math.max(0, prev - 1));
+  }, []);
+  const goNextSong = React.useCallback(() => {
+    setCurrentSetlistIndex(prev => Math.min(songCount - 1, prev + 1));
+  }, [songCount]);
+
+  useEffect(() => {
+    if (!canNavigateSetlist) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement;
+      const typing = el instanceof HTMLElement &&
+        (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      if (typing || isEditing) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        e.preventDefault();
+        goNextSong();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        goPrevSong();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canNavigateSetlist, isEditing, goNextSong, goPrevSong]);
+
   const listVisibleNow = activeTab !== 'utilities' && ((!selectedSong && !selectedSetlist) || listVisible);
 
   return (
-    <div className={`fixed inset-0 flex flex-col overflow-hidden ${isDarkMode ? 'dark bg-zinc-950 text-white' : 'bg-zinc-50 text-zinc-900'} transition-colors duration-300`}>
+    <div data-mode={isCompact ? 'compact' : isTablet ? 'regular' : 'desktop'} className={`fixed inset-0 flex flex-col overflow-hidden ${isDarkMode ? 'dark bg-zinc-950 text-white' : 'bg-zinc-50 text-zinc-900'} transition-colors duration-300`}>
       
       {/* Header */}
       {!isFullScreen && (
@@ -1438,10 +1492,12 @@ export default function App() {
               className="w-6 h-6 rounded-lg shadow-sm"
               referrerPolicy="no-referrer"
             />
-            <div className="flex flex-col">
-              <span className="font-bold text-lg tracking-tighter leading-none">Caninde<span className="text-blue-600">Chords</span></span>
-              <span className="text-[9px] text-zinc-400 font-mono leading-none mt-0.5">v{APP_VERSION}</span>
-            </div>
+            {!isCompact && (
+              <div className="flex flex-col">
+                <span className="font-bold text-lg tracking-tighter leading-none">Caninde<span className="text-blue-600">Chords</span></span>
+                <span className="text-[9px] text-zinc-400 font-mono leading-none mt-0.5">v{APP_VERSION}</span>
+              </div>
+            )}
             {!isOnline && (
               <div className="flex items-center gap-2 text-amber-500 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 px-2 py-1 rounded-lg">
                 <WifiOff size={12} />
@@ -1452,15 +1508,16 @@ export default function App() {
 
           {/* Setlist Navigation Center/Mobile */}
           {selectedSetlist && (
-            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-1.5 md:px-2.5 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700 mx-2 md:mx-4 overflow-hidden max-w-[140px] sm:max-w-sm lg:max-w-md h-8">
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-1 md:px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700 mx-1 md:mx-4 min-w-0 max-w-[190px] sm:max-w-sm lg:max-w-md">
               {/* Mobile Sidebar Toggle - Only if not forced by preferences */}
               {isCompact && !listVisible && (
                 <button
                   onClick={() => setListVisible(true)}
-                  className="p-1 rounded-md transition-colors text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg transition-colors text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                   title={t.songs}
+                  aria-label={t.songs}
                 >
-                  <List size={16} />
+                  <List size={20} />
                 </button>
               )}
 
@@ -1472,17 +1529,19 @@ export default function App() {
               <div className="flex items-center gap-0.5 px-1 border-r border-zinc-300 dark:border-zinc-700 mr-1">
                 <button 
                   disabled={currentSetlistIndex === 0 || (activeSession && !isDirector)}
-                  onClick={() => setCurrentSetlistIndex(prev => prev - 1)}
-                  className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md disabled:opacity-30 transition-colors"
+                  onClick={goPrevSong}
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg disabled:opacity-30 transition-colors"
+                  aria-label={t.previous || 'Anterior'}
                 >
-                  <ChevronLeft size={16} />
+                  <ChevronLeft size={20} />
                 </button>
                 <button 
                   disabled={currentSetlistIndex === selectedSetlist.songIds.length - 1 || (activeSession && !isDirector)}
-                  onClick={() => setCurrentSetlistIndex(prev => prev + 1)}
-                  className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md disabled:opacity-30 transition-colors"
+                  onClick={goNextSong}
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg disabled:opacity-30 transition-colors"
+                  aria-label={t.next || 'Siguiente'}
                 >
-                  <ChevronRight size={16} />
+                  <ChevronRight size={20} />
                 </button>
               </div>
 
@@ -1541,10 +1600,10 @@ export default function App() {
                   {t.install || 'Install'}
                 </button>
               )}
-              <button onClick={() => window.location.reload()} className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500" title="Actualizar">
+              <button onClick={() => window.location.reload()} className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500" title="Actualizar" aria-label="Actualizar">
                 <RefreshCw size={18} />
               </button>
-              <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">
+              <button onClick={() => setIsDarkMode(!isDarkMode)} className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label={isDarkMode ? (t.lightMode || 'Light mode') : (t.darkMode || 'Dark mode')}>
                 {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
               <div className="flex items-center gap-1.5">
@@ -1561,12 +1620,13 @@ export default function App() {
                     setHasPendingProfileChanges(false);
                     setPreferencesModal(true);
                   }} 
-                  className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800" 
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   title={t.settings}
+                  aria-label={t.settings}
                 >
                   <Settings size={18} className="text-emerald-500" />
                 </button>
-                <button onClick={handleLogout} className="p-1.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800" title={t.logout}>
+                <button onClick={handleLogout} className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800" title={t.logout} aria-label={t.logout}>
                   <LogOut size={18} />
                 </button>
               </div>
@@ -1637,7 +1697,7 @@ export default function App() {
                       placeholder={`${t.search} ${t.songs}...`}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      className="w-full min-h-11 pl-9 pr-3 bg-zinc-100 dark:bg-zinc-900 border-none rounded-lg t-ui focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     />
                   </div>
                 </div>
@@ -1662,21 +1722,21 @@ export default function App() {
                             setIsEditing(false); 
                             setListVisible(false);
                           }}
-                          className={`w-full p-2 rounded-xl text-left flex items-center justify-between group transition-all ${currentSetlistIndex === item.originalIndex && !selectedSong ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : item.song ? 'hover:bg-zinc-100 dark:hover:bg-zinc-900' : 'opacity-50 cursor-not-allowed bg-red-50/30 dark:bg-red-900/10'}`}
+                          className={`w-full min-h-[3.25rem] px-3 py-2 rounded-xl text-left flex items-center justify-between group transition-all ${currentSetlistIndex === item.originalIndex && !selectedSong ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : item.song ? 'hover:bg-zinc-100 dark:hover:bg-zinc-900' : 'opacity-50 cursor-not-allowed bg-red-50/30 dark:bg-red-900/10'}`}
                         >
                           <div className="flex-1 min-w-0 flex items-center gap-2">
                             <span className={`text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full ${currentSetlistIndex === item.originalIndex && !selectedSong ? 'bg-white/20' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>
                               {item.originalIndex + 1}
                             </span>
                             <div className="truncate">
-                              <p className="font-bold truncate text-xs">{item.song?.title || t.missingSong}</p>
-                              <p className={`text-[10px] truncate ${currentSetlistIndex === item.originalIndex && !selectedSong ? 'text-blue-100' : 'text-zinc-500'}`}>
+                              <p className="font-bold truncate t-title">{item.song?.title || t.missingSong}</p>
+                              <p className={`t-meta truncate ${currentSetlistIndex === item.originalIndex && !selectedSong ? 'text-blue-100' : 'text-zinc-500'}`}>
                                 {item.song?.artist || (item.song ? 'Unknown Artist' : 'ID: ' + item.id.substring(0, 8) + '...')}
                               </p>
                             </div>
                           </div>
                           {item.song ? (
-                            <ChevronRight size={14} className={currentSetlistIndex === item.originalIndex && !selectedSong ? 'text-white' : 'text-zinc-400 opacity-0 group-hover:opacity-100'} />
+                            <ChevronRight size={14} className={currentSetlistIndex === item.originalIndex && !selectedSong ? 'text-white' : 'text-zinc-400 opacity-60 group-hover:opacity-100'} />
                           ) : (
                             <X size={14} className="text-red-500" />
                           )}
@@ -1721,19 +1781,19 @@ export default function App() {
                   <div className="flex bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg">
                     <button 
                       onClick={() => { setActiveTab('songs'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
-                      className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'songs' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
+                      className={`flex-1 min-h-11 rounded-md t-ui font-bold transition-all ${activeTab === 'songs' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
                     >
                       {t.songs}
                     </button>
                     <button 
                       onClick={() => { setActiveTab('setlists'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
-                      className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'setlists' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
+                      className={`flex-1 min-h-11 rounded-md t-ui font-bold transition-all ${activeTab === 'setlists' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
                     >
                       {t.setlists}
                     </button>
                     <button 
                       onClick={() => { setActiveTab('utilities'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
-                      className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === 'utilities' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
+                      className={`flex-1 min-h-11 rounded-md t-ui font-bold transition-all ${activeTab === 'utilities' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
                     >
                       {t.utilities}
                     </button>
@@ -1747,7 +1807,7 @@ export default function App() {
                         placeholder={`${t.search} ${activeTab === 'songs' ? t.songs : t.setlists}...`}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full min-h-11 pl-9 pr-3 bg-zinc-100 dark:bg-zinc-900 border-none rounded-lg t-ui focus:ring-2 focus:ring-blue-500 outline-none"
                       />
                     </div>
                   )}
@@ -1765,17 +1825,17 @@ export default function App() {
                             setIsEditing(false); 
                             setListVisible(false);
                           }}
-                          className={`w-full p-2 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSong?.id === song.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
+                          className={`w-full min-h-[3.25rem] px-3 py-2 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSong?.id === song.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold truncate text-xs">{song.title}</p>
-                            <p className={`text-[10px] truncate ${selectedSong?.id === song.id ? 'text-blue-100' : 'text-zinc-500'}`}>
+                            <p className="font-bold truncate t-title">{song.title}</p>
+                            <p className={`t-meta truncate ${selectedSong?.id === song.id ? 'text-blue-100' : 'text-zinc-500'}`}>
                               {song.artist || 'Unknown Artist'}
                             </p>
                           </div>
                           <div className="flex items-center gap-1">
                             {song.collaborators && song.collaborators.length > 0 && <Users size={12} className="opacity-50" />}
-                            <ChevronRight size={14} className={selectedSong?.id === song.id ? 'text-white' : 'text-zinc-400 opacity-0 group-hover:opacity-100'} />
+                            <ChevronRight size={14} className={selectedSong?.id === song.id ? 'text-white' : 'text-zinc-400 opacity-60 group-hover:opacity-100'} />
                           </div>
                         </button>
                       ))}
@@ -1808,17 +1868,17 @@ export default function App() {
                             setIsEditing(false);
                             setListVisible(isCompact);
                           }}
-                          className={`w-full p-2 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSetlist?.id === setlist.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
+                          className={`w-full min-h-[3.25rem] px-3 py-2 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSetlist?.id === setlist.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold truncate text-xs">{setlist.name}</p>
-                            <p className={`text-[10px] truncate ${selectedSetlist?.id === setlist.id ? 'text-blue-100' : 'text-zinc-500'}`}>
+                            <p className="font-bold truncate t-title">{setlist.name}</p>
+                            <p className={`t-meta truncate ${selectedSetlist?.id === setlist.id ? 'text-blue-100' : 'text-zinc-500'}`}>
                               {setlist.songIds.length} {t.songs.toLowerCase()}
                             </p>
                           </div>
                           <div className="flex items-center gap-1">
                             {setlist.collaborators && setlist.collaborators.length > 0 && <Users size={12} className="opacity-50" />}
-                            <ChevronRight size={14} className={selectedSetlist?.id === setlist.id ? 'text-white' : 'text-zinc-400 opacity-0 group-hover:opacity-100'} />
+                            <ChevronRight size={14} className={selectedSetlist?.id === setlist.id ? 'text-white' : 'text-zinc-400 opacity-60 group-hover:opacity-100'} />
                           </div>
                         </button>
                       ))}
@@ -2148,28 +2208,28 @@ export default function App() {
               className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === 'songs' && !selectedSong && !selectedSetlist && !isEditing ? 'text-blue-500' : 'text-zinc-500'}`}
             >
               <Music size={24} />
-              <span className="text-[10px] font-bold mt-1">{t.songs}</span>
+              <span className="t-ui-sm font-bold mt-1">{t.songs}</span>
             </button>
             <button 
               onClick={() => { setActiveTab('setlists'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
               className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === 'setlists' && !selectedSong && !selectedSetlist && !isEditing ? 'text-blue-500' : 'text-zinc-500'}`}
             >
               <List size={24} />
-              <span className="text-[10px] font-bold mt-1">{t.setlists}</span>
+              <span className="t-ui-sm font-bold mt-1">{t.setlists}</span>
             </button>
             <button 
               onClick={() => { setActiveTab('utilities'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
               className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === 'utilities' ? 'text-blue-500' : 'text-zinc-500'}`}
             >
               <Compass size={24} />
-              <span className="text-[10px] font-bold mt-1">{t.utilities}</span>
+              <span className="t-ui-sm font-bold mt-1">{t.utilities}</span>
             </button>
             <button 
               onClick={() => { setSelectedSong(null); setSelectedSetlist(null); setIsEditing(true); }}
               className={`flex flex-col items-center p-2 rounded-xl transition-all ${isEditing ? 'text-blue-500' : 'text-zinc-500'}`}
             >
               <Plus size={24} />
-              <span className="text-[10px] font-bold mt-1">{t.new}</span>
+              <span className="t-ui-sm font-bold mt-1">{t.new}</span>
             </button>
             {deferredPrompt && (
               <button 
@@ -2177,7 +2237,7 @@ export default function App() {
                 className="flex flex-col items-center p-2 text-blue-600 animate-pulse"
               >
                 <Plus size={24} className="bg-blue-600 text-white rounded-full p-1" />
-                <span className="text-[10px] font-bold mt-1">{t.install || 'Install'}</span>
+                <span className="t-ui-sm font-bold mt-1">{t.install || 'Install'}</span>
               </button>
             )}
           </nav>

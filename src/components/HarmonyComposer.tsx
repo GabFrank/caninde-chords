@@ -841,7 +841,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                                 key={slot.id}
                                 onClick={() => setMenuSlotIdx(i)}
                                 title={slot.gesture || ''}
-                                className={`relative flex flex-col items-center justify-center w-[64px] h-[58px] rounded-xl border transition-all ${active ? 'border-blue-500 ring-2 ring-blue-500/30 bg-blue-50 dark:bg-blue-900/20' : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-blue-400'}`}
+                                className={`relative flex flex-col items-center justify-center w-[clamp(3.5rem,18vw,5rem)] h-[3.625rem] rounded-xl border transition-all ${active ? 'border-blue-500 ring-2 ring-blue-500/30 bg-blue-50 dark:bg-blue-900/20' : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-blue-400'}`}
                               >
                                 <span className="text-sm font-black font-mono text-zinc-900 dark:text-white leading-none">{getChordString(slot.chord)}</span>
                                 <span className="text-[13px] leading-none mt-1">{emo.emoji}</span>
@@ -853,7 +853,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                           <button
                             onClick={() => openAddToSection(run)}
                             title={tr('Agregar acorde aquí', 'Add chord here')}
-                            className="w-[64px] h-[58px] rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-400 hover:border-blue-500 hover:text-blue-500 transition-all"
+                            className="w-[clamp(3.5rem,18vw,5rem)] h-[3.625rem] rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-400 hover:border-blue-500 hover:text-blue-500 transition-all"
                           >
                             <Plus size={16} />
                           </button>

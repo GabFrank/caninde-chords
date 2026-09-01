@@ -241,7 +241,7 @@ export const GuitarTuner: React.FC = () => {
   };
 
   return (
-    <div id="guitar-tuner-container" className="flex flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 w-full max-w-2xl mx-auto space-y-8">
+    <div id="guitar-tuner-container" className="flex flex-col items-center justify-center p-3 sm:p-6 bg-zinc-50 dark:bg-zinc-950 rounded-3xl border border-zinc-200 dark:border-zinc-800 w-full max-w-2xl mx-auto space-y-4 sm:space-y-8">
       
       {/* Selector & Info */}
       <div className="flex justify-between items-center w-full">

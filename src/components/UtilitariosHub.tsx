@@ -29,7 +29,7 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ onExportToSong, 
       
       {/* Visual Navigation Subheader */}
       <div className="flex justify-center items-center py-2 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="inline-flex items-center gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
+        <div className="inline-flex max-w-full overflow-x-auto touch-scrolling items-center gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50">
           
           <button
             onClick={() => setActiveSubTab('composer')}

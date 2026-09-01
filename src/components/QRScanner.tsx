@@ -112,10 +112,10 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           {/* Scoped Area (Darkness around central square) */}
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]">
             {/* The transparent "hole" for scanning */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] h-[280px] bg-transparent border-none shadow-[0_0_0_100vmax_rgba(0,0,0,0.6)] rounded-2xl md:rounded-3xl" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(70vmin,280px)] h-[min(70vmin,280px)] bg-transparent border-none shadow-[0_0_0_100vmax_rgba(0,0,0,0.6)] rounded-2xl md:rounded-3xl" />
           </div>
 
-          <div className="relative w-[280px] h-[280px]">
+          <div className="relative w-[min(70vmin,280px)] h-[min(70vmin,280px)]">
             {/* Animated Scanning Line */}
             {isCameraReady && (
               <motion.div 
@@ -149,7 +149,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
         </div>
 
         {/* Footer info/controls */}
-        <div className="p-10 bg-gradient-to-t from-black/80 to-transparent flex flex-col items-center gap-6 z-10">
+        <div className="p-4 sm:p-10 bg-gradient-to-t from-black/80 to-transparent flex flex-col items-center gap-6 z-10">
           <p className="text-white font-medium text-sm text-center">Point your camera at the Director's QR code</p>
           
           <div className="flex items-center gap-4">

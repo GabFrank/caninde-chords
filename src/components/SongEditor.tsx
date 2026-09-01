@@ -127,7 +127,7 @@ export const SongEditor: React.FC<SongEditorProps> = ({ initialSong, onSave, onC
           </div>
         </div>
         
-        <div className="flex-1 flex flex-col min-h-[400px] relative">
+        <div className="flex-1 flex flex-col min-h-[12rem] relative">
           <div className="flex items-center justify-between mb-1">
             <label className="block text-sm font-medium text-zinc-500">{t.content}</label>
             <div className="flex gap-2">
@@ -162,13 +162,13 @@ export const SongEditor: React.FC<SongEditorProps> = ({ initialSong, onSave, onC
             ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="flex-1 w-full p-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono resize-none min-h-[500px]"
+            className="flex-1 w-full p-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono resize-none min-h-[14rem]"
             placeholder="[G] Amazing grace, how [C] sweet the [G] sound..."
           />
 
           {/* Tags Dialog */}
           {showTagsDialog && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-xl">
+            <div className="fixed inset-0 z-50 z-20 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-xl">
               <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-2xl w-full max-w-xs border border-zinc-200 dark:border-zinc-800">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold">Tags</h3>
@@ -196,7 +196,7 @@ export const SongEditor: React.FC<SongEditorProps> = ({ initialSong, onSave, onC
 
           {/* Capo Dialog */}
           {showCapoDialog && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-xl">
+            <div className="fixed inset-0 z-50 z-20 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-xl">
               <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-2xl w-full max-w-xs border border-zinc-200 dark:border-zinc-800">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold">{t.selectFret}</h3>
@@ -224,7 +224,7 @@ export const SongEditor: React.FC<SongEditorProps> = ({ initialSong, onSave, onC
 
           {/* Chord Dialog */}
           {showChordDialog && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-xl">
+            <div className="fixed inset-0 z-50 z-20 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-xl">
               <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl shadow-2xl w-full max-w-md border border-zinc-200 dark:border-zinc-800">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold">{t.selectChord}</h3>
