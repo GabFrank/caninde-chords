@@ -67,6 +67,14 @@ const MESSAGES: Record<string, Copy> = {
     es: 'Ya existe una cuenta con este email usando otro método de acceso.',
     en: 'An account with this email already exists using another sign-in method.',
   },
+  'app/auth-timeout': {
+    es: 'El acceso no se resolvió. El navegador puede estar bloqueando el intercambio con franco-control.firebaseapp.com (cookies de terceros). Probá de nuevo, o desde el navegador en vez de la app instalada.',
+    en: 'Sign-in never resolved. The browser may be blocking the exchange with franco-control.firebaseapp.com (third-party cookies). Try again, or from the browser instead of the installed app.',
+  },
+  'app/profile-timeout': {
+    es: 'Entraste, pero la base de datos no respondió a tiempo. Seguimos sin tu perfil; revisá tu conexión.',
+    en: 'You are signed in, but the database did not respond in time. Continuing without your profile; check your connection.',
+  },
   'permission-denied': {
     es: 'Entraste, pero la base de datos rechazó la lectura de tu perfil. Revisá las reglas de Firestore.',
     en: 'You signed in, but the database rejected reading your profile. Check the Firestore rules.',

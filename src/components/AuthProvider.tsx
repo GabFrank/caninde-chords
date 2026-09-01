@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, getRedirectResult, User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -24,6 +24,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<AuthIssue | null>(null);
+  /** Se marca en cuanto el estado de acceso queda resuelto, para desarmar el vigilante. */
+  const settled = useRef(false);
 
   const updateProfile = React.useCallback(async (updates: Partial<UserProfile>) => {
     if (!user) return;
@@ -31,6 +33,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await setDoc(doc(db, 'users', user.uid), newProfile, { merge: true });
     setProfile(newProfile);
   }, [user, profile]);
+
+  // La pantalla de carga no puede ser eterna. Un try/finally no protege contra una
+  // promesa que nunca se resuelve, y eso es justo lo que pasa cuando el navegador
+  // corta el intercambio entre web.app y el authDomain (firebaseapp.com), o cuando
+  // Firestore no contesta. Pasado el plazo mostramos la app y decimos qué pasó.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (settled.current) return;
+      const signedIn = Boolean(auth.currentUser);
+      console.warn('Auth resolution timed out', { signedIn });
+      setAuthError(describeAuthError({ code: signedIn ? 'app/profile-timeout' : 'app/auth-timeout' }));
+      setLoading(false);
+      setIsAuthReady(true);
+    }, 12000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Al volver de signInWithRedirect, el resultado (o el error real de Google)
   // aparece aquí. Sin esto un fallo de redirección era invisible.
@@ -74,6 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfile(null);
         setAuthError(describeAuthError(error));
       } finally {
+        settled.current = true;
         setLoading(false);
         setIsAuthReady(true);
       }
