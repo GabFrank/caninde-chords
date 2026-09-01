@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* El layout lo decide useViewport() a 700px. Los `md:` que quedan son
+   cosméticos, pero si conservan el umbral por defecto (768px) queda una franja
+   de 68px donde el JS dice "regular" y el CSS sigue en modo teléfono. */
+@theme {
+  --breakpoint-md: 43.75rem;
+}
+
 @layer base {
   html, body, #root {
     height: 100%;

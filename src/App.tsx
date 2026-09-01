@@ -13,6 +13,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Music, Plus, LogIn, LogOut, Settings, Settings2, List, Search, ChevronRight, ChevronLeft, ChevronDown, Share2, Trash2, Edit2, UserPlus, Sun, Moon, Maximize2, Minimize2, Columns, Users, X, XCircle, Radio, Copy, Check, Maximize, Hash, WifiOff, Upload, RefreshCw, Save, Mail, AlertCircle, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getLogoUrl, isStandalonePWA } from './lib/utils';
+import { useViewport } from './lib/useViewport';
 import { importOpenSongFile } from './lib/openSongParser';
 import { UtilitariosHub } from './components/UtilitariosHub';
 import { AuthDiagnostics } from './components/AuthDiagnostics';
@@ -302,8 +303,10 @@ export default function App() {
   const [sidebarPosition, setSidebarPosition] = useState<'left' | 'right'>('left');
   const [sidebarWidth, setSidebarWidth] = useState(20);
   const [isToolbarExpanded, setIsToolbarExpanded] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
+  // El layout se decide por ancho Y alto: un teléfono acostado es ancho y bajo,
+  // y con el criterio anterior (solo ancho) recibía el layout de escritorio.
+  const { mode, isLandscape, isTablet } = useViewport();
+  const isCompact = mode === 'compact';
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -311,8 +314,6 @@ export default function App() {
   // Handle window resize, online status and PWA install prompt
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-      setIsPortrait(window.innerHeight > window.innerWidth);
     };
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -942,7 +943,7 @@ export default function App() {
   const [p2pOnline, setP2POnline] = useState(false);
   const [showDirectorDialog, setShowDirectorDialog] = useState(false);
   const [showShareSessionDialog, setShowShareSessionDialog] = useState(false);
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [listVisible, setListVisible] = useState(false);
 
   const handleSessionClosed = () => {
     setActiveSession(null);
@@ -1414,8 +1415,15 @@ export default function App() {
 
   // En móvil funcionamos como maestro-detalle: se ve la LISTA o el contenido.
   // La lista está visible mientras no haya nada seleccionado (navegando) o
-  // mientras el usuario la mantenga abierta con `showMobileSidebar`.
-  const showListOnMobile = activeTab !== 'utilities' && ((!selectedSong && !selectedSetlist) || showMobileSidebar);
+  // mientras el usuario la mantenga abierta con `listVisible`.
+  useEffect(() => {
+    // Al cambiar de modo la bandera de "lista abierta" pierde sentido: si no se
+    // resetea, rotar el teléfono con un setlist abierto deja al músico en la
+    // lista y le saca la canción de la pantalla.
+    setListVisible(false);
+  }, [mode]);
+
+  const listVisibleNow = activeTab !== 'utilities' && ((!selectedSong && !selectedSetlist) || listVisible);
 
   return (
     <div className={`fixed inset-0 flex flex-col overflow-hidden ${isDarkMode ? 'dark bg-zinc-950 text-white' : 'bg-zinc-50 text-zinc-900'} transition-colors duration-300`}>
@@ -1446,9 +1454,9 @@ export default function App() {
           {selectedSetlist && (
             <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-1.5 md:px-2.5 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700 mx-2 md:mx-4 overflow-hidden max-w-[140px] sm:max-w-sm lg:max-w-md h-8">
               {/* Mobile Sidebar Toggle - Only if not forced by preferences */}
-              {isMobile && !showMobileSidebar && (
+              {isCompact && !listVisible && (
                 <button
-                  onClick={() => setShowMobileSidebar(true)}
+                  onClick={() => setListVisible(true)}
                   className="p-1 rounded-md transition-colors text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                   title={t.songs}
                 >
@@ -1566,12 +1574,12 @@ export default function App() {
           </header>
         )}
 
-        <main className={`flex-1 min-h-0 flex ${isMobile ? 'flex-col' : 'flex-row'} ${sidebarPosition === 'right' ? 'flex-row-reverse' : ''} overflow-hidden relative`}>
+        <main className={`flex-1 min-h-0 flex ${isCompact ? 'flex-col' : 'flex-row'} ${sidebarPosition === 'right' ? 'flex-row-reverse' : ''} overflow-hidden relative`}>
           
           {/* Sidebar / List */}
           <div 
-            style={{ width: isMobile ? '100%' : `${sidebarWidth}%` }}
-            className={`${isMobile ? 'flex-1 min-h-0' : 'flex-shrink-0'} border-zinc-200 dark:border-zinc-800 flex flex-col ${sidebarPosition === 'left' ? 'border-r' : 'border-l'} ${(isFullScreen || isEditing) ? 'hidden md:flex' : (isMobile && !showListOnMobile) ? 'hidden' : 'flex'}`}
+            style={{ width: isCompact ? '100%' : `clamp(15rem, ${sidebarWidth}%, 26rem)` }}
+            className={`${isCompact ? 'flex-1 min-h-0' : 'flex-shrink-0'} border-zinc-200 dark:border-zinc-800 flex flex-col ${sidebarPosition === 'left' ? 'border-r' : 'border-l'} ${(isFullScreen || isEditing) ? (isCompact ? 'hidden' : 'flex') : (isCompact && !listVisibleNow) ? 'hidden' : 'flex'}`}
           >
             {selectedSetlist ? (
               <div className="flex flex-col h-full overflow-hidden">
@@ -1591,8 +1599,8 @@ export default function App() {
 
                   <div className="flex items-center gap-0.5">
                     <button
-                      onClick={() => setShowMobileSidebar(false)}
-                      className="md:hidden p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
+                      onClick={() => setListVisible(false)}
+                      className={`${isCompact ? '' : 'hidden'} p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors`}
                       title={t.back}
                     >
                       <ChevronLeft size={16} />
@@ -1652,7 +1660,7 @@ export default function App() {
                             setCurrentSetlistIndex(item.originalIndex); 
                             setSelectedSong(null); 
                             setIsEditing(false); 
-                            setShowMobileSidebar(false);
+                            setListVisible(false);
                           }}
                           className={`w-full p-2 rounded-xl text-left flex items-center justify-between group transition-all ${currentSetlistIndex === item.originalIndex && !selectedSong ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : item.song ? 'hover:bg-zinc-100 dark:hover:bg-zinc-900' : 'opacity-50 cursor-not-allowed bg-red-50/30 dark:bg-red-900/10'}`}
                         >
@@ -1745,7 +1753,7 @@ export default function App() {
                   )}
                 </div>
  
-                <div className="flex-1 min-h-0 overflow-auto touch-scrolling px-1 pb-20 md:pb-4">
+                <div className={`flex-1 min-h-0 overflow-auto touch-scrolling px-1 ${isCompact ? 'pb-24' : 'pb-4'}`}>
                   {activeTab === 'songs' ? (
                     <div className="space-y-0.5">
                       {filteredSongs.map(song => (
@@ -1755,7 +1763,7 @@ export default function App() {
                             setSelectedSong(song); 
                             setSelectedSetlist(null); 
                             setIsEditing(false); 
-                            setShowMobileSidebar(false);
+                            setListVisible(false);
                           }}
                           className={`w-full p-2 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSong?.id === song.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
                         >
@@ -1798,7 +1806,7 @@ export default function App() {
                             setSelectedSong(null);
                             setCurrentSetlistIndex(0);
                             setIsEditing(false);
-                            setShowMobileSidebar(true);
+                            setListVisible(isCompact);
                           }}
                           className={`w-full p-2 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSetlist?.id === setlist.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
                         >
@@ -1839,7 +1847,7 @@ export default function App() {
           </div>
 
           {/* Content Area */}
-          <div className={`flex-1 relative flex flex-col overflow-hidden ${(isFullScreen || isEditing || activeTab === 'utilities') ? 'flex' : (isMobile && showListOnMobile) ? 'hidden' : (selectedSong || selectedSetlist) ? 'flex' : 'hidden md:flex'}`}>
+          <div className={`flex-1 relative flex flex-col overflow-hidden ${(isFullScreen || isEditing || activeTab === 'utilities') ? 'flex' : (isCompact && listVisibleNow) ? 'hidden' : (selectedSong || selectedSetlist) ? 'flex' : (isCompact ? 'hidden' : 'flex')}`}>
             <AnimatePresence mode="wait">
               {activeTab === 'utilities' ? (
                 <motion.div
@@ -1885,12 +1893,12 @@ export default function App() {
                   className="h-full flex flex-col"
                 >
                   {/* Toolbar */}
-                  <div className="p-1 border-b border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-1 bg-white dark:bg-zinc-950">
-                    <div className="flex items-center justify-between w-full md:w-auto gap-0.5">
+                  <div className={`p-1 border-b border-zinc-200 dark:border-zinc-800 flex ${isCompact ? 'flex-col' : 'flex-row'} items-center justify-between gap-1 bg-white dark:bg-zinc-950`}>
+                    <div className={`flex items-center justify-between gap-0.5 ${isCompact ? 'w-full' : 'w-auto'}`}>
                       <div className="flex items-center gap-0.5">
                         <button 
                           onClick={() => { setSelectedSong(null); setSelectedSetlist(null); }} 
-                          className="md:hidden p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg"
+                          className={`${isCompact ? '' : 'hidden'} p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg`}
                         >
                           <ChevronRight className="rotate-180" size={18} />
                         </button>
@@ -1930,15 +1938,24 @@ export default function App() {
                         </button>
                       </div>
  
+                      <button
+                        onClick={toggleFullScreen}
+                        className={`p-1.5 rounded-lg transition-all ${isFullScreen ? 'bg-blue-600 text-white' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                        title={t.fullscreen}
+                        aria-label={t.fullscreen}
+                      >
+                        {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                      </button>
+
                       <button 
                         onClick={() => setIsToolbarExpanded(!isToolbarExpanded)}
-                        className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg md:hidden"
+                        className={`p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg ${isCompact ? '' : 'hidden'}`}
                       >
                         <ChevronDown size={16} className={`transition-transform duration-200 ${isToolbarExpanded ? 'rotate-180 text-blue-500' : ''}`} />
                       </button>
                     </div>
  
-                    <div className={`${isToolbarExpanded ? 'flex' : 'hidden'} md:flex items-center gap-1 flex-wrap justify-center`}>
+                    <div className={`${!isCompact || isToolbarExpanded ? 'flex' : 'hidden'} items-center gap-1 flex-wrap justify-center`}>
                         {/* Transpose */}
                         <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-lg p-0.5" title={t.transpose}>
                           <button onClick={() => {
@@ -2020,13 +2037,6 @@ export default function App() {
                           <Save size={16} />
                         </button>
  
-                      <button 
-                        onClick={toggleFullScreen} 
-                        className={`p-1.5 rounded-lg transition-all ${isFullScreen ? 'bg-blue-600 text-white' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
-                        title={t.fullscreen}
-                      >
-                        {isFullScreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                      </button>
                       {isFullScreen && wakeLockRef.current && (
                         <div className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 text-amber-500 rounded-lg text-[10px] font-bold uppercase animate-pulse">
                           <Sun size={12} />
@@ -2113,7 +2123,7 @@ export default function App() {
                   </div>
                 </motion.div>
               ) : (
-                <div className="hidden md:flex flex-col items-center justify-center h-full text-zinc-500 space-y-6">
+                <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-6">
                   <div className="relative">
                     <div className="absolute -inset-8 bg-blue-500/5 blur-3xl rounded-full" />
                     <img 
@@ -2132,7 +2142,7 @@ export default function App() {
 
       {/* Mobile Bottom Nav */}
       {!isFullScreen && (
-        <nav className="md:hidden flex-none border-t border-zinc-200 dark:border-zinc-800 p-2 flex justify-around bg-white dark:bg-zinc-950 safe-area-x pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <nav className={`${isCompact ? 'flex' : 'hidden'} flex-none border-t border-zinc-200 dark:border-zinc-800 p-2 flex justify-around bg-white dark:bg-zinc-950 safe-area-x pb-[max(0.5rem,env(safe-area-inset-bottom))]`}>
             <button 
               onClick={() => { setActiveTab('songs'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
               className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === 'songs' && !selectedSong && !selectedSetlist && !isEditing ? 'text-blue-500' : 'text-zinc-500'}`}
