@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Song, Setlist, Session, UserSongSettings } from '../types';
 import { ChevronLeft, ChevronRight, List, Users, Radio, XCircle } from 'lucide-react';
 import { SongViewer } from './SongViewer';
+import { useViewport } from '../lib/useViewport';
 import { useAuth } from './AuthProvider';
 import { DirectorModeDialog } from './DirectorModeDialog';
 import { motion, AnimatePresence } from 'motion/react';
@@ -83,6 +84,7 @@ export const SetlistViewer: React.FC<SetlistViewerProps> = ({
   const { profile } = useAuth();
   const [showIndex, setShowIndex] = useState(false);
   const swipeRef = useRef<SwipeStart>(null);
+  const { mode } = useViewport();
   const [showDirectorDialog, setShowDirectorDialog] = useState(false);
   
   // Sync internal state with external props if provided
@@ -597,7 +599,7 @@ export const SetlistViewer: React.FC<SetlistViewerProps> = ({
         {/* Navegación flotante. Antes vivía sólo en pantalla completa, así que en
             ensayo (donde nadie usa fullscreen porque necesita la toolbar) el único
             modo de pasar de canción era un chevron de 24px en la cabecera. */}
-        {setlistSongs.length > 1 && (
+        {setlistSongs.length > 1 && (mode === 'compact' || isFullScreen) && (
           <div className="absolute bottom-4 right-4 safe-area-x flex flex-col items-end gap-3 z-30">
             <div className="flex items-center gap-2">
               <button 

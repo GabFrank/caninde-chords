@@ -80,9 +80,11 @@ export function useViewport(): Viewport {
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const measure = () => {
-      // Mientras se escribe, el alto que informa el navegador es el del teclado,
-      // no el del dispositivo: no se recalcula nada.
-      if (isTyping() || keyboardIsOpen()) return;
+      // Mientras el teclado virtual está desplegado, el alto que informa el
+      // navegador es el suyo, no el del dispositivo. En escritorio tener foco en
+      // un campo no implica teclado, así que sólo se descarta si además la
+      // ventana visual encogió.
+      if (keyboardIsOpen() || (isTyping() && window.visualViewport === undefined)) return;
       setViewport((prev) => {
         const next = resolveLayout(window.innerWidth, window.innerHeight, prev.isShort);
         if (
@@ -99,23 +101,27 @@ export function useViewport(): Viewport {
     // rAF colapsa a un frame, pero durante un arrastre eso son 60 recálculos por
     // segundo y cada cambio de modo reflowea la app entera: hace falta debounce.
     const schedule = () => {
-      if (frame) cancelAnimationFrame(frame);
-      if (timer) clearTimeout(timer);
+      if (frame !== null) cancelAnimationFrame(frame);
+      if (timer !== null) clearTimeout(timer);
       timer = setTimeout(() => {
         frame = requestAnimationFrame(measure);
       }, 150);
     };
 
     window.addEventListener('resize', schedule);
+    // Al soltar el foco hay que volver a medir: el navegador no emite otro
+    // `resize` por sí solo y el estado quedaría con las dimensiones viejas.
+    window.addEventListener('focusout', schedule);
     // En iOS `orientationchange` llega antes de que innerWidth/Height se
     // actualicen; el `resize` posterior es el que trae los valores buenos.
     window.addEventListener('orientationchange', schedule);
     window.visualViewport?.addEventListener('resize', schedule);
 
     return () => {
-      if (frame) cancelAnimationFrame(frame);
-      if (timer) clearTimeout(timer);
+      if (frame !== null) cancelAnimationFrame(frame);
+      if (timer !== null) clearTimeout(timer);
       window.removeEventListener('resize', schedule);
+      window.removeEventListener('focusout', schedule);
       window.removeEventListener('orientationchange', schedule);
       window.visualViewport?.removeEventListener('resize', schedule);
     };

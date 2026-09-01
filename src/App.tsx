@@ -38,7 +38,7 @@ const Modal: React.FC<{
 
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div data-overlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -297,7 +297,11 @@ export default function App() {
         wakeLockRef.current = null;
       }
     }
-    setIsFullScreen(!isFullScreen);
+    // Si el navegador no ofrece pantalla completa (iPhone), no cambiamos el
+    // estado: esconder la cabecera sin estar en fullscreen deja al usuario sin
+    // salida visible.
+    const fsEl = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+    if (fsEl.requestFullscreen || fsEl.webkitRequestFullscreen) setIsFullScreen(!isFullScreen);
   };
 
   useEffect(() => {
@@ -338,8 +342,6 @@ export default function App() {
 
   // Handle window resize, online status and PWA install prompt
   useEffect(() => {
-    const handleResize = () => {
-    };
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     const handleBeforeInstallPrompt = (e: any) => {
@@ -347,13 +349,11 @@ export default function App() {
       setDeferredPrompt(e);
     };
 
-    window.addEventListener('resize', handleResize);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -969,6 +969,7 @@ export default function App() {
   const [showDirectorDialog, setShowDirectorDialog] = useState(false);
   const [showShareSessionDialog, setShowShareSessionDialog] = useState(false);
   const [listVisible, setListVisible] = useState(false);
+  const [actionsSheetOpen, setActionsSheetOpen] = useState(false);
 
   const handleSessionClosed = () => {
     setActiveSession(null);
@@ -1449,7 +1450,11 @@ export default function App() {
   }, [mode]);
 
   const canNavigateSetlist = Boolean(selectedSetlist) && !(activeSession && !isDirector);
-  const songCount = selectedSetlist?.songIds.length ?? 0;
+  // El visor indexa la lista YA filtrada, así que acotar contra songIds.length
+  // dejaba pasar índices sin canción y la pantalla quedaba en blanco.
+  const songCount = selectedSetlist
+    ? selectedSetlist.songIds.filter(id => songs.some(song => song.id === id)).length
+    : 0;
 
   const goPrevSong = React.useCallback(() => {
     setCurrentSetlistIndex(prev => Math.max(0, prev - 1));
@@ -1464,8 +1469,10 @@ export default function App() {
       const el = document.activeElement;
       const typing = el instanceof HTMLElement &&
         (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-      if (typing || isEditing) return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+      // Con un diálogo abierto la navegación no debe seguir corriendo por
+      // debajo: en Modo Director eso se transmite a toda la banda.
+      if (typing || isEditing || document.querySelector('[data-overlay]')) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         e.preventDefault();
         goNextSong();
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
@@ -1508,7 +1515,7 @@ export default function App() {
 
           {/* Setlist Navigation Center/Mobile */}
           {selectedSetlist && (
-            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-1 md:px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700 mx-1 md:mx-4 min-w-0 max-w-[190px] sm:max-w-sm lg:max-w-md">
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-1 md:px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700 mx-1 md:mx-4 min-w-0 flex-shrink overflow-hidden max-w-full sm:max-w-sm lg:max-w-md">
               {/* Mobile Sidebar Toggle - Only if not forced by preferences */}
               {isCompact && !listVisible && (
                 <button
@@ -1600,6 +1607,19 @@ export default function App() {
                   {t.install || 'Install'}
                 </button>
               )}
+              {isCompact ? (
+                <>
+                  <img src={user.photoURL || ''} alt="" className="w-7 h-7 rounded-full border border-zinc-200 dark:border-zinc-700" />
+                  <button
+                    onClick={() => setActionsSheetOpen(true)}
+                    className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    aria-label={t.settings}
+                  >
+                    <Settings2 size={20} className="text-emerald-500" />
+                  </button>
+                </>
+              ) : (
+                <>
               <button onClick={() => window.location.reload()} className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500" title="Actualizar" aria-label="Actualizar">
                 <RefreshCw size={18} />
               </button>
@@ -1630,6 +1650,8 @@ export default function App() {
                   <LogOut size={18} />
                 </button>
               </div>
+                </>
+              )}
             </div>
           </header>
         )}
@@ -1638,7 +1660,7 @@ export default function App() {
           
           {/* Sidebar / List */}
           <div 
-            style={{ width: isCompact ? '100%' : `clamp(15rem, ${sidebarWidth}%, 26rem)` }}
+            style={{ width: isCompact ? '100%' : `clamp(13rem, ${sidebarWidth}%, 40rem)` }}
             className={`${isCompact ? 'flex-1 min-h-0' : 'flex-shrink-0'} border-zinc-200 dark:border-zinc-800 flex flex-col ${sidebarPosition === 'left' ? 'border-r' : 'border-l'} ${(isFullScreen || isEditing) ? (isCompact ? 'hidden' : 'flex') : (isCompact && !listVisibleNow) ? 'hidden' : 'flex'}`}
           >
             {selectedSetlist ? (
@@ -1722,7 +1744,7 @@ export default function App() {
                             setIsEditing(false); 
                             setListVisible(false);
                           }}
-                          className={`w-full min-h-[3.25rem] px-3 py-2 rounded-xl text-left flex items-center justify-between group transition-all ${currentSetlistIndex === item.originalIndex && !selectedSong ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : item.song ? 'hover:bg-zinc-100 dark:hover:bg-zinc-900' : 'opacity-50 cursor-not-allowed bg-red-50/30 dark:bg-red-900/10'}`}
+                          className={`w-full ${isCompact && isLandscape ? 'min-h-11 py-1.5' : 'min-h-[3.25rem] py-2'} px-3 rounded-xl text-left flex items-center justify-between group transition-all ${currentSetlistIndex === item.originalIndex && !selectedSong ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : item.song ? 'hover:bg-zinc-100 dark:hover:bg-zinc-900' : 'opacity-50 cursor-not-allowed bg-red-50/30 dark:bg-red-900/10'}`}
                         >
                           <div className="flex-1 min-w-0 flex items-center gap-2">
                             <span className={`text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full ${currentSetlistIndex === item.originalIndex && !selectedSong ? 'bg-white/20' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'}`}>
@@ -1813,7 +1835,7 @@ export default function App() {
                   )}
                 </div>
  
-                <div className={`flex-1 min-h-0 overflow-auto touch-scrolling px-1 ${isCompact ? 'pb-24' : 'pb-4'}`}>
+                <div className={`flex-1 min-h-0 overflow-auto touch-scrolling px-1 ${isCompact ? 'pb-20' : 'pb-4'}`}>
                   {activeTab === 'songs' ? (
                     <div className="space-y-0.5">
                       {filteredSongs.map(song => (
@@ -1825,7 +1847,7 @@ export default function App() {
                             setIsEditing(false); 
                             setListVisible(false);
                           }}
-                          className={`w-full min-h-[3.25rem] px-3 py-2 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSong?.id === song.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
+                          className={`w-full ${isCompact && isLandscape ? 'min-h-11 py-1.5' : 'min-h-[3.25rem] py-2'} px-3 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSong?.id === song.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
                         >
                           <div className="flex-1 min-w-0">
                             <p className="font-bold truncate t-title">{song.title}</p>
@@ -1868,7 +1890,7 @@ export default function App() {
                             setIsEditing(false);
                             setListVisible(isCompact);
                           }}
-                          className={`w-full min-h-[3.25rem] px-3 py-2 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSetlist?.id === setlist.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
+                          className={`w-full ${isCompact && isLandscape ? 'min-h-11 py-1.5' : 'min-h-[3.25rem] py-2'} px-3 rounded-xl text-left flex items-center justify-between group transition-all ${selectedSetlist?.id === setlist.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
                         >
                           <div className="flex-1 min-w-0">
                             <p className="font-bold truncate t-title">{setlist.name}</p>
@@ -2202,7 +2224,7 @@ export default function App() {
 
       {/* Mobile Bottom Nav */}
       {!isFullScreen && (
-        <nav className={`${isCompact ? 'flex' : 'hidden'} flex-none border-t border-zinc-200 dark:border-zinc-800 p-2 flex justify-around bg-white dark:bg-zinc-950 safe-area-x pb-[max(0.5rem,env(safe-area-inset-bottom))]`}>
+        <nav className={`${isCompact ? 'flex' : 'hidden'} flex-none border-t border-zinc-200 dark:border-zinc-800 p-2 justify-around bg-white dark:bg-zinc-950 safe-area-x pb-[max(0.5rem,env(safe-area-inset-bottom))]`}>
             <button 
               onClick={() => { setActiveTab('songs'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
               className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === 'songs' && !selectedSong && !selectedSetlist && !isEditing ? 'text-blue-500' : 'text-zinc-500'}`}
@@ -2241,6 +2263,39 @@ export default function App() {
               </button>
             )}
           </nav>
+        )}
+
+        {actionsSheetOpen && (
+          <div
+            data-overlay
+            className="fixed inset-0 z-[60] bg-black/50 flex items-end"
+            onClick={() => setActionsSheetOpen(false)}
+          >
+            <div
+              className="w-full bg-white dark:bg-zinc-900 rounded-t-3xl p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] safe-area-x"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {[
+                { icon: <RefreshCw size={20} />, label: t.refresh || 'Actualizar', run: () => window.location.reload() },
+                { icon: isDarkMode ? <Sun size={20} /> : <Moon size={20} />, label: isDarkMode ? (t.lightMode || 'Modo claro') : (t.darkMode || 'Modo oscuro'), run: () => setIsDarkMode(!isDarkMode) },
+                { icon: <Settings size={20} className="text-emerald-500" />, label: t.settings, run: () => {
+                  setTempProfile({ ...profile, sidebarPosition, sidebarWidth, defaultFontSize: fontSize, defaultColumns: columns });
+                  setHasPendingProfileChanges(false);
+                  setPreferencesModal(true);
+                } },
+                { icon: <LogOut size={20} />, label: t.logout, run: handleLogout },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  onClick={() => { setActionsSheetOpen(false); item.run(); }}
+                  className="w-full min-h-12 px-4 flex items-center gap-3 rounded-xl t-ui font-semibold hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Modals */}
