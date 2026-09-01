@@ -1,3 +1,10 @@
+## [2.15.2](https://github.com/GabFrank/caninde-chords/compare/v2.15.1...v2.15.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* **ui:** el boton de tema vuelve a controlar toda la interfaz ([92d967c](https://github.com/GabFrank/caninde-chords/commit/92d967c74d36ded1beca0c2f64aab8dc275e947c))
+
 ## [2.15.1](https://github.com/GabFrank/caninde-chords/compare/v2.15.0...v2.15.1) (2026-09-01)
 
 
