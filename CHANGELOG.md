@@ -1,3 +1,10 @@
+## [2.15.1](https://github.com/GabFrank/caninde-chords/compare/v2.15.0...v2.15.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **ui:** pantalla en blanco por hooks despues de los returns tempranos ([f277d0d](https://github.com/GabFrank/caninde-chords/commit/f277d0db8f6970af58674ecc71eb5fac7ec4d94f))
+
 # [2.15.0](https://github.com/GabFrank/caninde-chords/compare/v2.14.1...v2.15.0) (2026-09-01)
 
 
