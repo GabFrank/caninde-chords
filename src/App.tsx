@@ -1337,6 +1337,51 @@ export default function App() {
   const currentItem = selectedSong || selectedSetlist;
   const canEdit = currentItem && (currentItem.ownerId === user?.uid || currentItem.editors?.includes(user?.email || ''));
 
+  // Estos hooks tienen que quedar POR ENCIMA de los returns tempranos: si se
+  // declaran debajo, no corren sin sesión y sí con sesión, y React aborta el
+  // render con "rendered more hooks than during the previous render".
+  useEffect(() => {
+    // Al cambiar de modo la bandera de "lista abierta" pierde sentido: si no se
+    // resetea, rotar el teléfono con un setlist abierto deja al músico en la
+    // lista y le saca la canción de la pantalla.
+    setListVisible(false);
+  }, [mode]);
+
+  const canNavigateSetlist = Boolean(selectedSetlist) && !(activeSession && !isDirector);
+  // El visor indexa la lista YA filtrada, así que acotar contra songIds.length
+  // dejaba pasar índices sin canción y la pantalla quedaba en blanco.
+  const songCount = selectedSetlist
+    ? selectedSetlist.songIds.filter(id => songs.some(song => song.id === id)).length
+    : 0;
+
+  const goPrevSong = React.useCallback(() => {
+    setCurrentSetlistIndex(prev => Math.max(0, prev - 1));
+  }, []);
+  const goNextSong = React.useCallback(() => {
+    setCurrentSetlistIndex(prev => Math.min(songCount - 1, prev + 1));
+  }, [songCount]);
+
+  useEffect(() => {
+    if (!canNavigateSetlist) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement;
+      const typing = el instanceof HTMLElement &&
+        (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      // Con un diálogo abierto la navegación no debe seguir corriendo por
+      // debajo: en Modo Director eso se transmite a toda la banda.
+      if (typing || isEditing || document.querySelector('[data-overlay]')) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        e.preventDefault();
+        goNextSong();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        goPrevSong();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canNavigateSetlist, isEditing, goNextSong, goPrevSong]);
+
   if (loading) {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center bg-zinc-950 text-white gap-6 safe-area-top">
@@ -1442,47 +1487,6 @@ export default function App() {
   // En móvil funcionamos como maestro-detalle: se ve la LISTA o el contenido.
   // La lista está visible mientras no haya nada seleccionado (navegando) o
   // mientras el usuario la mantenga abierta con `listVisible`.
-  useEffect(() => {
-    // Al cambiar de modo la bandera de "lista abierta" pierde sentido: si no se
-    // resetea, rotar el teléfono con un setlist abierto deja al músico en la
-    // lista y le saca la canción de la pantalla.
-    setListVisible(false);
-  }, [mode]);
-
-  const canNavigateSetlist = Boolean(selectedSetlist) && !(activeSession && !isDirector);
-  // El visor indexa la lista YA filtrada, así que acotar contra songIds.length
-  // dejaba pasar índices sin canción y la pantalla quedaba en blanco.
-  const songCount = selectedSetlist
-    ? selectedSetlist.songIds.filter(id => songs.some(song => song.id === id)).length
-    : 0;
-
-  const goPrevSong = React.useCallback(() => {
-    setCurrentSetlistIndex(prev => Math.max(0, prev - 1));
-  }, []);
-  const goNextSong = React.useCallback(() => {
-    setCurrentSetlistIndex(prev => Math.min(songCount - 1, prev + 1));
-  }, [songCount]);
-
-  useEffect(() => {
-    if (!canNavigateSetlist) return;
-    const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement;
-      const typing = el instanceof HTMLElement &&
-        (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-      // Con un diálogo abierto la navegación no debe seguir corriendo por
-      // debajo: en Modo Director eso se transmite a toda la banda.
-      if (typing || isEditing || document.querySelector('[data-overlay]')) return;
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-        e.preventDefault();
-        goNextSong();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        e.preventDefault();
-        goPrevSong();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [canNavigateSetlist, isEditing, goNextSong, goPrevSong]);
 
   const listVisibleNow = activeTab !== 'utilities' && ((!selectedSong && !selectedSetlist) || listVisible);
 
@@ -1803,19 +1807,19 @@ export default function App() {
                   <div className="flex bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg">
                     <button 
                       onClick={() => { setActiveTab('songs'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
-                      className={`flex-1 min-h-11 rounded-md t-ui font-bold transition-all ${activeTab === 'songs' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
+                      className={`flex-1 min-w-0 truncate px-1 min-h-11 rounded-md t-ui-sm font-bold transition-all ${activeTab === 'songs' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
                     >
                       {t.songs}
                     </button>
                     <button 
                       onClick={() => { setActiveTab('setlists'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
-                      className={`flex-1 min-h-11 rounded-md t-ui font-bold transition-all ${activeTab === 'setlists' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
+                      className={`flex-1 min-w-0 truncate px-1 min-h-11 rounded-md t-ui-sm font-bold transition-all ${activeTab === 'setlists' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
                     >
                       {t.setlists}
                     </button>
                     <button 
                       onClick={() => { setActiveTab('utilities'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
-                      className={`flex-1 min-h-11 rounded-md t-ui font-bold transition-all ${activeTab === 'utilities' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
+                      className={`flex-1 min-w-0 truncate px-1 min-h-11 rounded-md t-ui-sm font-bold transition-all ${activeTab === 'utilities' ? 'bg-white dark:bg-zinc-800 shadow-sm' : 'text-zinc-500'}`}
                     >
                       {t.utilities}
                     </button>
