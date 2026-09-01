@@ -20,7 +20,7 @@ interface SetlistViewerProps {
   notation?: 'scientific' | 'solfege';
   chordFontSize?: number;
   showCapo?: boolean;
-  onFontSizeChange?: (size: number) => void;
+  onFontSizeChange?: (size: number, origin: 'user' | 'layout') => void;
   onColumnsChange?: (cols: number) => void;
   userSongSettings?: Record<string, UserSongSettings>;
   onSettingsChange?: (songId: string, settings: Partial<UserSongSettings>) => void;
@@ -565,7 +565,7 @@ export const SetlistViewer: React.FC<SetlistViewerProps> = ({
             maxFontSize={maxFontSize}
             autoResize={autoResize}
             songSettings={userSongSettings?.[currentSong.id]}
-            onFontSizeChange={(newSize) => onFontSizeChange?.(newSize)}
+            onFontSizeChange={(newSize, origin) => onFontSizeChange?.(newSize, origin)}
             onColumnsChange={(newCols) => onColumnsChange?.(newCols)}
             onSettingsChange={(settings) => onSettingsChange?.(currentSong.id, settings)}
             t={t}

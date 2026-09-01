@@ -2042,9 +2042,10 @@ export default function App() {
                         maxFontSize={profile?.maxFontSize}
                         autoResize={autoResize}
                         songSettings={userSongSettings[selectedSong.id]}
-                        onFontSizeChange={(newSize) => {
+                        onFontSizeChange={(newSize, origin) => {
                           setFontSize(newSize);
-                          setHasPendingSongChanges(true);
+                          // Un reajuste inducido por el layout no es una edición del usuario.
+                          if (origin === 'user') setHasPendingSongChanges(true);
                         }}
                         onColumnsChange={(newCols) => {
                           setColumns(newCols);
@@ -2069,9 +2070,10 @@ export default function App() {
                         minFontSize={profile?.minFontSize}
                         maxFontSize={profile?.maxFontSize}
                         autoResize={autoResize}
-                        onFontSizeChange={(newSize) => {
+                        onFontSizeChange={(newSize, origin) => {
                           setFontSize(newSize);
-                          setHasPendingSongChanges(true);
+                          // Un reajuste inducido por el layout no es una edición del usuario.
+                          if (origin === 'user') setHasPendingSongChanges(true);
                         }}
                         onColumnsChange={(newCols) => {
                           setColumns(newCols);

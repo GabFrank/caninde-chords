@@ -17,7 +17,12 @@ interface SongViewerProps {
   maxFontSize?: number;
   autoResize?: boolean;
   songSettings?: UserSongSettings;
-  onFontSizeChange?: (size: number) => void;
+  /**
+   * `origin` distingue el ajuste pedido por el usuario del que induce un cambio
+   * de tamaño del contenedor: sin eso, redimensionar la ventana marcaba la
+   * canción como modificada y encendía el botón Guardar sin que nadie tocara nada.
+   */
+  onFontSizeChange?: (size: number, origin: 'user' | 'layout') => void;
   onColumnsChange?: (cols: number) => void;
   onSettingsChange?: (settings: Partial<UserSongSettings>) => void;
   t: any;
@@ -48,6 +53,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
 
   // Use song-specific settings if available, otherwise use props
   const currentAutoResize = autoResize;
+  const headerRef = useRef<HTMLDivElement>(null);
   const currentFontSize = fontSize;
   const currentColumns = columns;
   const currentTranspose = transpose;
@@ -61,13 +67,13 @@ export const SongViewer: React.FC<SongViewerProps> = ({
   }, []);
 
   useEffect(() => {
-    const handleFit = () => {
+    const handleFit = (origin: 'user' | 'layout') => {
       if (!containerRef.current || !contentRef.current || !onFontSizeChange || !currentAutoResize) return;
 
       const container = containerRef.current;
       const content = contentRef.current;
       
-      const headerHeight = container.querySelector('.mb-8')?.clientHeight || 0;
+      const headerHeight = headerRef.current?.clientHeight || 0;
       const availableHeight = container.clientHeight - headerHeight - 64;
       
       if (availableHeight <= 0) return;
@@ -98,11 +104,11 @@ export const SongViewer: React.FC<SongViewerProps> = ({
       content.style.fontSize = `${currentFontSize}px`;
 
       if (bestFontSize !== currentFontSize && Math.abs(bestFontSize - currentFontSize) >= 1) {
-        onFontSizeChange(Math.round(bestFontSize));
+        onFontSizeChange(Math.round(bestFontSize), origin);
       }
     };
 
-    const fitHandler = () => handleFit();
+    const fitHandler = () => handleFit('user');
     window.addEventListener('fit-to-screen', fitHandler);
     
     let frameId: number | null = null;
@@ -110,7 +116,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
       resizeObserverRef.current = new ResizeObserver(() => {
         if (frameId) window.cancelAnimationFrame(frameId);
         frameId = window.requestAnimationFrame(() => {
-          handleFit();
+          handleFit('layout');
         });
       });
       resizeObserverRef.current.observe(containerRef.current);
@@ -165,7 +171,7 @@ export const SongViewer: React.FC<SongViewerProps> = ({
         className={`flex-1 touch-scrolling p-1 md:p-2 ${isFullscreen ? 'p-0.5 md:p-1' : ''} overflow-y-auto overflow-x-hidden`}
         style={{ fontSize: `${currentFontSize}px` }}
       >
-        <div className="mb-1 flex justify-between items-start shrink-0">
+        <div ref={headerRef} className="mb-1 flex justify-between items-start shrink-0">
           <div className="flex-1">
             <div className="flex items-center gap-3">
               {(song.key || song.tempo) && (
