@@ -1,3 +1,10 @@
+## [2.12.2](https://github.com/GabFrank/caninde-chords/compare/v2.12.1...v2.12.2) (2026-09-01)
+
+
+### Bug Fixes
+
+* **auth:** mostrar el motivo real del fallo de login y no quedar mudo ([1cc975e](https://github.com/GabFrank/caninde-chords/commit/1cc975e0ed40a36bc343740c62834fb6806845a8))
+
 ## [2.12.1](https://github.com/GabFrank/caninde-chords/compare/v2.12.0...v2.12.1) (2026-08-01)
 
 
