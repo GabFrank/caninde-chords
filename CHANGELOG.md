@@ -1,3 +1,10 @@
+# [2.13.0](https://github.com/GabFrank/caninde-chords/compare/v2.12.4...v2.13.0) (2026-09-01)
+
+
+### Features
+
+* **auth:** diagnostico de acceso en la propia pantalla de login ([47175cd](https://github.com/GabFrank/caninde-chords/commit/47175cd0e84fc125225a44daebea5c39fa320ef4))
+
 ## [2.12.4](https://github.com/GabFrank/caninde-chords/compare/v2.12.3...v2.12.4) (2026-09-01)
 
 
