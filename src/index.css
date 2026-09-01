@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* La app conmuta el tema poniendo y quitando la clase `dark` en su raíz, pero en
+   Tailwind v4 la variante `dark:` sigue por defecto a prefers-color-scheme. Sin
+   esta declaración, los cientos de utilidades `dark:*` ignoraban el botón de
+   tema y obedecían al sistema operativo: con el sistema en claro, la app quedaba
+   con el fondo oscuro y las tarjetas, pestañas y campos claros. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* El layout lo decide useViewport() a 700px. Los `md:` que quedan son
    cosméticos, pero si conservan el umbral por defecto (768px) queda una franja
    de 68px donde el JS dice "regular" y el CSS sigue en modo teléfono. */
