@@ -14,6 +14,8 @@ interface AuthContextType {
   /** Último fallo de acceso, para mostrarlo en pantalla en vez de volver mudo al login. */
   authError: AuthIssue | null;
   setAuthError: (issue: AuthIssue | null) => void;
+  /** Milisegundos que tardó Firebase en resolver el estado de acceso; null si nunca lo hizo. */
+  authResolvedMs: number | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,6 +28,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<AuthIssue | null>(null);
   /** Se marca en cuanto el estado de acceso queda resuelto, para desarmar el vigilante. */
   const settled = useRef(false);
+  const startedAt = useRef(Date.now());
+  const [authResolvedMs, setAuthResolvedMs] = useState<number | null>(null);
 
   const updateProfile = React.useCallback(async (updates: Partial<UserProfile>) => {
     if (!user) return;
@@ -93,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAuthError(describeAuthError(error));
       } finally {
         settled.current = true;
+        setAuthResolvedMs(Date.now() - startedAt.current);
         setLoading(false);
         setIsAuthReady(true);
       }
@@ -102,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isAuthReady, updateProfile, authError, setAuthError }}>
+    <AuthContext.Provider value={{ user, profile, loading, isAuthReady, updateProfile, authError, setAuthError, authResolvedMs }}>
       {children}
     </AuthContext.Provider>
   );

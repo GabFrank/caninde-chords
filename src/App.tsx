@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getLogoUrl, isStandalonePWA } from './lib/utils';
 import { importOpenSongFile } from './lib/openSongParser';
 import { UtilitariosHub } from './components/UtilitariosHub';
+import { AuthDiagnostics } from './components/AuthDiagnostics';
 import { describeAuthError, preferredLang } from './lib/authErrors';
 
 // Custom Modal Component
@@ -50,7 +51,7 @@ declare const __APP_VERSION__: string;
 const APP_VERSION = __APP_VERSION__;
 
 export default function App() {
-  const { user, profile, loading, isAuthReady, updateProfile, authError, setAuthError } = useAuth();
+  const { user, profile, loading, isAuthReady, updateProfile, authError, setAuthError, authResolvedMs } = useAuth();
   
   useEffect(() => {
     // Attempt to unlock orientation if the API is available
@@ -1386,6 +1387,8 @@ export default function App() {
               )}
             </div>
           )}
+
+          <AuthDiagnostics authResolvedMs={authResolvedMs} />
 
           <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-600">
             v{APP_VERSION}
