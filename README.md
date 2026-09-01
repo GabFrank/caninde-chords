@@ -21,9 +21,11 @@ Firebase.
 
 ```bash
 npm install
-# Edita .env.local y pon tu GEMINI_API_KEY (ver .env.example)
 npm run dev      # http://localhost:3000
 ```
+
+No hace falta configurar variables de entorno: la configuración de Firebase es
+pública y vive en `firebase-applet-config.json`.
 
 ## Publicación
 
@@ -35,6 +37,7 @@ URL pública: https://franco-control.web.app
 
 ## Documentación
 
-- **[DEPLOY.md](DEPLOY.md)** — desarrollo local, secrets y publicación.
+- **[DEPLOY.md](DEPLOY.md)** — infraestructura, publicación, caché y base de datos.
+- **[AUTH.md](AUTH.md)** — cómo funciona el acceso con Google y cómo depurarlo.
 - **[AGENTS.md](AGENTS.md)** — arquitectura, reglas de negocio y workflows.
 - **[TODO.md](TODO.md)** — backlog de mejoras.

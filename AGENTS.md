@@ -1,6 +1,12 @@
-# OpenSong App - Project Context & Rules
+# CanindeChords - Project Context & Rules
 
-Este documento sirve como base de conocimiento para el desarrollo del proyecto OpenSong. Capture las decisiones arquitectónicas, reglas de negocio y workflows críticos establecidos durante las sesiones de desarrollo.
+Este documento sirve como base de conocimiento para el desarrollo de CanindeChords
+(gestor de canciones, acordes y setlists; importa y exporta el formato OpenSong).
+Captura las decisiones arquitectónicas, reglas de negocio y workflows críticos
+establecidos durante las sesiones de desarrollo.
+
+La infraestructura y la publicación están en **[DEPLOY.md](DEPLOY.md)**; el acceso
+con Google, en **[AUTH.md](AUTH.md)**.
 
 ## 🚀 Workflows Principales
 
@@ -29,12 +35,24 @@ Este documento sirve como base de conocimiento para el desarrollo del proyecto O
 - **Identidad:** Siempre usar `user.uid` para filtrar y asignar `ownerId`.
 - **OriginalId:** Al aceptar un share o importar, guardar siempre el ID original en el campo `originalId` para mantener la trazabilidad.
 
-### 2. Estilo y UI
+### 2. Acceso y PWA
+- **Rutas `/__/`:** `navigateFallbackDenylist` en `vite.config.ts` DEBE excluir
+  `/^\/__\//`. Si el service worker atiende `/__/auth/iframe` o
+  `/__/auth/handler` con el `index.html` de la app, el acceso se cuelga sin
+  emitir ningún error. Ver [AUTH.md](AUTH.md).
+- **Errores de acceso:** nunca tragarse un fallo de acceso en un `console.error`.
+  Traducirlo con `describeAuthError()` y mostrarlo en pantalla con su código.
+- **Promesas que no resuelven:** el estado de acceso tiene un vigilante de 12 s.
+  Un `try/finally` no protege contra una promesa colgada.
+- **Popup vs redirección:** en la PWA instalada el acceso va siempre por
+  `signInWithRedirect`; el popup no puede devolver el resultado.
+
+### 3. Estilo y UI
 - **Frameworks:** React + Tailwind CSS + Lucide Icons + Framer Motion.
 - **Animaciones:** Usar `motion/react` para transiciones de estados y modales.
 - **Traducciones:** Todo texto visible debe estar en `src/translations.ts` (Soporte actual: `en`, `es`).
 
-### 3. Tipado (TypeScript)
+### 4. Tipado (TypeScript)
 - Las interfaces están en `src/types.ts`.
 - **Enums:** Usar `enum` estándar, no `const enum`.
 - **Imports:** Usar imports nombrados, evitar desestructuración en el import mismo si es posible.
