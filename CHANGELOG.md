@@ -1,3 +1,10 @@
+## [2.12.3](https://github.com/GabFrank/caninde-chords/compare/v2.12.2...v2.12.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* **auth:** entrar por redireccion en la PWA y dejar de cachear el shell ([8592479](https://github.com/GabFrank/caninde-chords/commit/85924799f8cbaf0e8e02c236f99dc3ca8bee3716))
+
 ## [2.12.2](https://github.com/GabFrank/caninde-chords/compare/v2.12.1...v2.12.2) (2026-09-01)
 
 
