@@ -1,3 +1,10 @@
+# [2.14.0](https://github.com/GabFrank/caninde-chords/compare/v2.13.0...v2.14.0) (2026-09-01)
+
+
+### Features
+
+* **auth:** registrar el resultado del intento de acceso entre recargas ([bbdf09f](https://github.com/GabFrank/caninde-chords/commit/bbdf09f488942970b169ec88ef62698378b4f54d))
+
 # [2.13.0](https://github.com/GabFrank/caninde-chords/compare/v2.12.4...v2.13.0) (2026-09-01)
 
 
