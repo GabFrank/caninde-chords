@@ -3,6 +3,7 @@ import { Stethoscope, Copy, Check, Loader2 } from 'lucide-react';
 import { auth } from '../firebase';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { preferredLang } from '../lib/authErrors';
+import { describeAttempt, readAttempt } from '../lib/loginAttempt';
 
 declare const __APP_VERSION__: string;
 
@@ -111,6 +112,7 @@ export const AuthDiagnostics: React.FC<{ authResolvedMs: number | null }> = ({ a
       { label: 'sesión activa', value: auth.currentUser?.email || 'ninguna' },
       { label: 'acceso resuelto en', value: authResolvedMs === null ? 'NUNCA' : `${authResolvedMs}ms` },
       { label: 'redirección pendiente', value: pendingRedirect() },
+      { label: 'último intento', value: (() => { const a = readAttempt(); return a ? describeAttempt(a) : 'ninguno'; })() },
       { label: 'identitytoolkit', value: identityToolkit },
       { label: 'iframe authDomain', value: authIframe },
       { label: 'cookies', value: navigator.cookieEnabled ? 'ok' : 'BLOQUEADAS' },

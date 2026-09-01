@@ -17,6 +17,7 @@ import { importOpenSongFile } from './lib/openSongParser';
 import { UtilitariosHub } from './components/UtilitariosHub';
 import { AuthDiagnostics } from './components/AuthDiagnostics';
 import { describeAuthError, preferredLang } from './lib/authErrors';
+import { recordAttempt, finishAttempt } from './lib/loginAttempt';
 
 // Custom Modal Component
 const Modal: React.FC<{ 
@@ -957,6 +958,7 @@ export default function App() {
     // ventana que lo abrió: se va directo por redirección.
     if (viaRedirect || isStandalonePWA()) {
       try {
+        recordAttempt('redirect');
         await signInWithRedirect(auth, googleProvider);
       } catch (error) {
         console.error('Redirect login failed', error);
@@ -965,13 +967,17 @@ export default function App() {
       return;
     }
     try {
+      recordAttempt('popup');
       await signInWithPopup(auth, googleProvider);
+      finishAttempt('ok');
     } catch (error) {
       console.error('Login failed', error);
+      finishAttempt((error as { code?: string })?.code || 'error');
       const issue = describeAuthError(error);
       setAuthError(issue);
       if (issue.autoRedirect) {
         try {
+          recordAttempt('redirect');
           await signInWithRedirect(auth, googleProvider);
         } catch (redirectError) {
           console.error('Redirect fallback failed', redirectError);

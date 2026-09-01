@@ -67,6 +67,10 @@ const MESSAGES: Record<string, Copy> = {
     es: 'Ya existe una cuenta con este email usando otro método de acceso.',
     en: 'An account with this email already exists using another sign-in method.',
   },
+  'app/redirect-empty': {
+    es: 'Volviste de Google sin credencial. Google corto el acceso de su lado: casi siempre es la pantalla de consentimiento OAuth (en modo Prueba o pendiente de verificacion) o una restriccion del proyecto. Fijate si Google te mostro algun mensaje durante el salto.',
+    en: 'You came back from Google without a credential. Google stopped the sign-in on its side: usually the OAuth consent screen (Testing mode or pending verification) or a project restriction. Check whether Google showed a message during the hop.',
+  },
   'app/auth-timeout': {
     es: 'El acceso no se resolvió. El navegador puede estar bloqueando el intercambio con franco-control.firebaseapp.com (cookies de terceros). Probá de nuevo, o desde el navegador en vez de la app instalada.',
     en: 'Sign-in never resolved. The browser may be blocking the exchange with franco-control.firebaseapp.com (third-party cookies). Try again, or from the browser instead of the installed app.',

@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { UserProfile } from '../types';
 import { AuthIssue, describeAuthError } from '../lib/authErrors';
+import { finishAttempt, readAttempt } from '../lib/loginAttempt';
 
 interface AuthContextType {
   user: User | null;
@@ -57,10 +58,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Al volver de signInWithRedirect, el resultado (o el error real de Google)
   // aparece aquí. Sin esto un fallo de redirección era invisible.
   useEffect(() => {
-    getRedirectResult(auth).catch((error) => {
-      console.error('Redirect sign-in failed', error);
-      setAuthError(describeAuthError(error));
-    });
+    getRedirectResult(auth)
+      .then((credential) => {
+        if (credential) {
+          finishAttempt('ok');
+          return;
+        }
+        // Volvimos de Google sin credencial y con un intento en curso: Google
+        // rechazó el acceso de su lado (pantalla de consentimiento, política o
+        // blocking function) sin devolverle un error a Firebase.
+        const attempt = readAttempt();
+        if (attempt?.method === 'redirect' && attempt.outcome === 'pendiente') {
+          finishAttempt('volvió-sin-credencial');
+          setAuthError(describeAuthError({ code: 'app/redirect-empty' }));
+        }
+      })
+      .catch((error) => {
+        console.error('Redirect sign-in failed', error);
+        finishAttempt((error as { code?: string })?.code || 'error');
+        setAuthError(describeAuthError(error));
+      });
   }, []);
 
   useEffect(() => {
