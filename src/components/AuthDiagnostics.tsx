@@ -46,6 +46,40 @@ function storageCheck(store: Storage | undefined): string {
   }
 }
 
+/**
+ * El chequeo que faltaba. Firebase Auth carga /__/auth/iframe como NAVEGACIÓN, y un
+ * service worker con navigateFallback puede responderla con el index.html de la app:
+ * el iframe queda conteniendo la app en vez del ayudante de Google y el intercambio
+ * nunca ocurre. Un fetch() no lo detecta porque no es una navegación; hay que montar
+ * el iframe de verdad y mirar qué cargó.
+ */
+function authIframeHijacked(): Promise<string> {
+  return new Promise((resolve) => {
+    const frame = document.createElement('iframe');
+    frame.style.display = 'none';
+    frame.src = `${window.location.origin}/__/auth/iframe`;
+    let done = false;
+    const finish = (value: string) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      frame.remove();
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish('sin respuesta (5s)'), 5000);
+    frame.onload = () => {
+      try {
+        const html = frame.contentDocument?.documentElement.innerHTML || '';
+        finish(html.includes('id="root"') ? 'SÍ - el SW sirve la app' : 'no');
+      } catch {
+        finish('no se pudo leer');
+      }
+    };
+    frame.onerror = () => finish('error al cargar');
+    document.body.appendChild(frame);
+  });
+}
+
 /** ¿Quedó una redirección a medias? Firebase guarda la marca en sessionStorage. */
 function pendingRedirect(): string {
   try {
@@ -104,6 +138,8 @@ export const AuthDiagnostics: React.FC<{ authResolvedMs: number | null }> = ({ a
       5000,
     );
 
+    const hijacked = await authIframeHijacked();
+
     setChecks([
       { label: 'versión', value: __APP_VERSION__ },
       { label: 'origen', value: window.location.origin },
@@ -115,6 +151,7 @@ export const AuthDiagnostics: React.FC<{ authResolvedMs: number | null }> = ({ a
       { label: 'último intento', value: (() => { const a = readAttempt(); return a ? describeAttempt(a) : 'ninguno'; })() },
       { label: 'identitytoolkit', value: identityToolkit },
       { label: 'iframe authDomain', value: authIframe },
+      { label: 'iframe secuestrado por SW', value: hijacked },
       { label: 'cookies', value: navigator.cookieEnabled ? 'ok' : 'BLOQUEADAS' },
       { label: 'localStorage', value: storageCheck(window.localStorage) },
       { label: 'sessionStorage', value: storageCheck(window.sessionStorage) },

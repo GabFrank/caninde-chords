@@ -33,7 +33,12 @@ export default defineConfig(({mode}) => {
         workbox: {
           // version.json nunca se cachea ni se sirve como index.html: siempre va a la red.
           globIgnores: ['**/node_modules/**/*', '**/version.json'],
-          navigateFallbackDenylist: [/^\/version\.json$/],
+          // /__/* son las rutas reservadas de Firebase (auth/iframe, auth/handler,
+          // firebase/init.json). Si el service worker las atiende con el index.html
+          // de la app, el iframe de Firebase Auth termina conteniendo CanindeChords
+          // en vez del ayudante de Google: el intercambio nunca ocurre y
+          // getRedirectResult se cuelga sin resolver ni fallar. Deben ir a la red.
+          navigateFallbackDenylist: [/^\/version\.json$/, /^\/__\//],
           // Cachea los samples del SoundFont de guitarra para que funcione offline
           // tras la primera carga.
           runtimeCaching: [
