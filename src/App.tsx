@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, arrayUnion, arrayRemove, or, getDoc, setDoc, getDocs, writeBatch } from 'firebase/firestore';
-import { signInWithPopup, signOut } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { useAuth } from './components/AuthProvider';
 import { Song, Setlist, UserProfile, UserSongSettings, Share, Contact, Session } from './types';
@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getLogoUrl } from './lib/utils';
 import { importOpenSongFile } from './lib/openSongParser';
 import { UtilitariosHub } from './components/UtilitariosHub';
+import { describeAuthError, preferredLang } from './lib/authErrors';
 
 // Custom Modal Component
 const Modal: React.FC<{ 
@@ -49,7 +50,7 @@ declare const __APP_VERSION__: string;
 const APP_VERSION = __APP_VERSION__;
 
 export default function App() {
-  const { user, profile, loading, isAuthReady, updateProfile } = useAuth();
+  const { user, profile, loading, isAuthReady, updateProfile, authError, setAuthError } = useAuth();
   
   useEffect(() => {
     // Attempt to unlock orientation if the API is available
@@ -944,11 +945,36 @@ export default function App() {
     setIsDirector(false);
   };
 
-  const handleLogin = async () => {
+  // El popup falla a menudo en móvil y en la PWA instalada (la ventana no puede
+  // devolverle el resultado a la que la abrió). Antes ese fallo se tragaba en
+  // silencio y la app volvía al login sin decir nada. Ahora: se cae a la
+  // redirección cuando el popup ni llegó a abrirse, y en el resto de los casos
+  // se muestra el motivo real.
+  const handleLogin = async (viaRedirect = false) => {
+    setAuthError(null);
+    if (viaRedirect) {
+      try {
+        await signInWithRedirect(auth, googleProvider);
+      } catch (error) {
+        console.error('Redirect login failed', error);
+        setAuthError(describeAuthError(error));
+      }
+      return;
+    }
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error('Login failed', error);
+      const issue = describeAuthError(error);
+      setAuthError(issue);
+      if (issue.autoRedirect) {
+        try {
+          await signInWithRedirect(auth, googleProvider);
+        } catch (redirectError) {
+          console.error('Redirect fallback failed', redirectError);
+          setAuthError(describeAuthError(redirectError));
+        }
+      }
     }
   };
 
@@ -1324,12 +1350,33 @@ export default function App() {
             </div>
           </div>
           <button 
-            onClick={handleLogin}
+            onClick={() => handleLogin()}
             className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg flex items-center justify-center gap-3 hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-600/20"
           >
             <LogIn size={24} />
             {t.login}
           </button>
+
+          {authError && (
+            <div className="text-left bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-2xl p-4 space-y-3">
+              <div className="flex gap-3">
+                <AlertCircle size={20} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                <div className="space-y-1 min-w-0">
+                  <p className="text-sm text-red-800 dark:text-red-200 font-medium break-words">{authError.message}</p>
+                  <p className="text-[11px] font-mono text-red-500 dark:text-red-400/80 break-all">{authError.code}</p>
+                </div>
+              </div>
+              {(authError.offerRedirect || authError.autoRedirect) && (
+                <button
+                  onClick={() => handleLogin(true)}
+                  className="w-full py-3 bg-red-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-700 transition-all active:scale-95"
+                >
+                  <RefreshCw size={16} />
+                  {preferredLang() === 'es' ? 'Probar con redirección' : 'Try with redirect'}
+                </button>
+              )}
+            </div>
+          )}
         </motion.div>
       </div>
     );

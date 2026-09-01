@@ -22,6 +22,9 @@ if (typeof window !== 'undefined' && !persistenceEnabled) {
 }
 
 export const googleProvider = new GoogleAuthProvider();
+// Varias apps comparten el cliente OAuth de este proyecto: pedir siempre la
+// cuenta evita que se reutilice en silencio la sesión de otra de ellas.
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 export enum OperationType {
   CREATE = 'create',
