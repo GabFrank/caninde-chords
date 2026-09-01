@@ -1,3 +1,18 @@
+# [2.15.0](https://github.com/GabFrank/caninde-chords/compare/v2.14.1...v2.15.0) (2026-09-01)
+
+
+### Bug Fixes
+
+* **ui:** corregir las regresiones que encontraron las auditorias ([c1221a8](https://github.com/GabFrank/caninde-chords/commit/c1221a8df15302bf4c1cf17ea166d6a5d9e80d24))
+* **ui:** modales con scroll, areas seguras laterales y unidades de viewport ([962ae9e](https://github.com/GabFrank/caninde-chords/commit/962ae9edd4eac052cec6e92166529f22931f3dd1)), closes [html/body/#root](https://github.com/html/body//issues/root)
+* **ui:** no marcar la cancion como modificada al redimensionar ([507bb6c](https://github.com/GabFrank/caninde-chords/commit/507bb6c44705086ea8458cc2d6a2ef7baa8cac66))
+
+
+### Features
+
+* **ui:** el layout se decide por ancho y alto, no solo por ancho ([fc136a8](https://github.com/GabFrank/caninde-chords/commit/fc136a88a0e57f0e1402a8364ddcd5cea6c90ad0))
+* **ui:** piso tactil de 44px, escala tipografica y pantallas sin adaptar ([8751d8d](https://github.com/GabFrank/caninde-chords/commit/8751d8de8fbedc90683a67d4f3289a96c46c3765))
+
 ## [2.14.1](https://github.com/GabFrank/caninde-chords/compare/v2.14.0...v2.14.1) (2026-09-01)
 
 
