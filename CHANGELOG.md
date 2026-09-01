@@ -1,3 +1,10 @@
+## [2.14.1](https://github.com/GabFrank/caninde-chords/compare/v2.14.0...v2.14.1) (2026-09-01)
+
+
+### Bug Fixes
+
+* **pwa:** excluir las rutas /__/ de Firebase del fallback del service worker ([69bbb17](https://github.com/GabFrank/caninde-chords/commit/69bbb1767ea7d27f41d59803377ad56554a6e266))
+
 # [2.14.0](https://github.com/GabFrank/caninde-chords/compare/v2.13.0...v2.14.0) (2026-09-01)
 
 
