@@ -574,7 +574,7 @@ export const SetlistViewer: React.FC<SetlistViewerProps> = ({
 
         {/* Floating Navigation for Fullscreen - Now simplified or removed as per user preference if top bar works */}
         {isFullScreen && (
-          <div className="absolute bottom-4 right-4 flex flex-col items-end gap-3 z-30">
+          <div className="absolute bottom-4 right-4 safe-area-x flex flex-col items-end gap-3 z-30">
             <div className="flex items-center gap-2">
               <button 
                 disabled={currentIndex === 0 || (activeSession && !isDirector)}
@@ -627,7 +627,7 @@ export const SetlistViewer: React.FC<SetlistViewerProps> = ({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl"
+              className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-sm max-h-[90dvh] overflow-y-auto shadow-2xl"
             >
               <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                 <h2 className="text-xl font-bold">{t.shareSession}</h2>

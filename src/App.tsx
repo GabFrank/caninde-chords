@@ -32,7 +32,7 @@ const Modal: React.FC<{
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[90vh]"
+        className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[90dvh]"
       >
         <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center shrink-0">
           <h3 className="text-xl font-bold">{title}</h3>
@@ -243,8 +243,16 @@ export default function App() {
   const toggleFullScreen = async () => {
     if (!isFullScreen) {
       try {
-        if (document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen();
+        // En iPhone `requestFullscreen` no existe en documentElement: sin este
+        // fallback el `if` no entra, no lanza error, y la app se creía en
+        // pantalla completa escondiendo la cabecera sin estarlo.
+        const el = document.documentElement as HTMLElement & {
+          webkitRequestFullscreen?: () => Promise<void>;
+        };
+        if (el.requestFullscreen) {
+          await el.requestFullscreen();
+        } else if (el.webkitRequestFullscreen) {
+          await el.webkitRequestFullscreen();
         }
         // Request wake lock
         if ('wakeLock' in navigator) {
@@ -1414,7 +1422,7 @@ export default function App() {
       
       {/* Header */}
       {!isFullScreen && (
-        <header className="p-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-inherit z-10 safe-area-top">
+        <header className="p-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-inherit z-10 safe-area-top safe-area-x">
           <div className="flex items-center gap-2">
             <img 
               src={getLogoUrl()} 
@@ -2124,7 +2132,7 @@ export default function App() {
 
       {/* Mobile Bottom Nav */}
       {!isFullScreen && (
-        <nav className="md:hidden flex-none border-t border-zinc-200 dark:border-zinc-800 p-2 flex justify-around bg-white dark:bg-zinc-950 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <nav className="md:hidden flex-none border-t border-zinc-200 dark:border-zinc-800 p-2 flex justify-around bg-white dark:bg-zinc-950 safe-area-x pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <button 
               onClick={() => { setActiveTab('songs'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
               className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === 'songs' && !selectedSong && !selectedSetlist && !isEditing ? 'text-blue-500' : 'text-zinc-500'}`}

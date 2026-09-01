@@ -161,7 +161,7 @@ export const SetlistEditor: React.FC<SetlistEditorProps> = ({ initialSetlist, av
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+              className="relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[80dvh]"
             >
               <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <h3 className="font-bold text-lg">{t.addSongs}</h3>

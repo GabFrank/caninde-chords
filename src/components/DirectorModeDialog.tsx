@@ -156,7 +156,7 @@ export const DirectorModeDialog: React.FC<DirectorModeDialogProps> = ({
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+        className="bg-white dark:bg-zinc-900 rounded-3xl w-full max-w-md max-h-[90dvh] overflow-y-auto shadow-2xl"
       >
         <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
