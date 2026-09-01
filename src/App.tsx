@@ -12,7 +12,7 @@ import { SetlistEditor } from './components/SetlistEditor';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Music, Plus, LogIn, LogOut, Settings, Settings2, List, Search, ChevronRight, ChevronLeft, ChevronDown, Share2, Trash2, Edit2, UserPlus, Sun, Moon, Maximize2, Minimize2, Columns, Users, X, XCircle, Radio, Copy, Check, Maximize, Hash, WifiOff, Upload, RefreshCw, Save, Mail, AlertCircle, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getLogoUrl } from './lib/utils';
+import { getLogoUrl, isStandalonePWA } from './lib/utils';
 import { importOpenSongFile } from './lib/openSongParser';
 import { UtilitariosHub } from './components/UtilitariosHub';
 import { describeAuthError, preferredLang } from './lib/authErrors';
@@ -952,7 +952,9 @@ export default function App() {
   // se muestra el motivo real.
   const handleLogin = async (viaRedirect = false) => {
     setAuthError(null);
-    if (viaRedirect) {
+    // En la PWA instalada el popup no tiene forma de devolver el resultado a la
+    // ventana que lo abrió: se va directo por redirección.
+    if (viaRedirect || isStandalonePWA()) {
       try {
         await signInWithRedirect(auth, googleProvider);
       } catch (error) {
@@ -1357,6 +1359,13 @@ export default function App() {
             {t.login}
           </button>
 
+          <button
+            onClick={() => handleLogin(true)}
+            className="w-full -mt-4 py-2 text-sm font-semibold text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          >
+            {preferredLang() === 'es' ? '¿No funciona? Entrar con redirección' : "Not working? Sign in with a redirect"}
+          </button>
+
           {authError && (
             <div className="text-left bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-2xl p-4 space-y-3">
               <div className="flex gap-3">
@@ -1377,6 +1386,10 @@ export default function App() {
               )}
             </div>
           )}
+
+          <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-600">
+            v{APP_VERSION}
+          </p>
         </motion.div>
       </div>
     );
