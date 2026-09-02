@@ -429,6 +429,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
           onClick={(e) => handlePreviewCandidate(cand, e)}
           className="absolute bottom-3 right-3 p-2 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500"
           title={tr('Oír sugerencia', 'Hear suggestion')}
+          aria-label={tr('Oír sugerencia', 'Hear suggestion')}
         >
           <Volume2 size={13} />
         </button>
@@ -791,6 +792,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                 onClick={triggerExport}
                 className="px-4 py-2 bg-zinc-800 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 transition-colors"
                 title={tr('Exportar como canción a la biblioteca', 'Export as a song to the library')}
+                aria-label={tr('Exportar como canción a la biblioteca', 'Export as a song to the library')}
               >
                 <FileSpreadsheet size={14} /> {tr('Exportar como Canción', 'Export as Song')}
               </button>
@@ -841,6 +843,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                                 key={slot.id}
                                 onClick={() => setMenuSlotIdx(i)}
                                 title={slot.gesture || ''}
+                                aria-label={slot.gesture || ''}
                                 className={`relative flex flex-col items-center justify-center w-[clamp(3.5rem,18vw,5rem)] h-[3.625rem] rounded-xl border transition-all ${active ? 'border-blue-500 ring-2 ring-blue-500/30 bg-blue-50 dark:bg-blue-900/20' : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-blue-400'}`}
                               >
                                 <span className="text-sm font-black font-mono text-zinc-900 dark:text-white leading-none">{getChordString(slot.chord)}</span>
@@ -853,6 +856,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                           <button
                             onClick={() => openAddToSection(run)}
                             title={tr('Agregar acorde aquí', 'Add chord here')}
+                            aria-label={tr('Agregar acorde aquí', 'Add chord here')}
                             className="w-[clamp(3.5rem,18vw,5rem)] h-[3.625rem] rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-zinc-400 hover:border-blue-500 hover:text-blue-500 transition-all"
                           >
                             <Plus size={16} />
@@ -1099,6 +1103,7 @@ export const HarmonyComposer: React.FC<HarmonyComposerProps> = ({ onExportToSong
                               onClick={(e) => handlePreviewCandidate(cand, e)}
                               className="absolute bottom-3 right-3 p-2 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-500"
                               title={tr('Oír sugerencia', 'Hear suggestion')}
+                              aria-label={tr('Oír sugerencia', 'Hear suggestion')}
                             >
                               <Volume2 size={13} />
                             </button>

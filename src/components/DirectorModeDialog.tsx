@@ -29,6 +29,16 @@ export const DirectorModeDialog: React.FC<DirectorModeDialogProps> = ({
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Escape cierra el diálogo: es la puerta de entrada al Modo Director y no
+  // tenía forma de salir con el teclado.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   useEffect(() => {
     setLoading(true);
     const q = query(
@@ -170,6 +180,7 @@ export const DirectorModeDialog: React.FC<DirectorModeDialogProps> = ({
               onClick={() => setRefreshKey(prev => prev + 1)}
               className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-500 transition-all active:rotate-180"
               title={t.refresh || 'Refresh'}
+              aria-label={t.refresh || 'Refresh'}
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
@@ -263,6 +274,7 @@ export const DirectorModeDialog: React.FC<DirectorModeDialogProps> = ({
                   disabled={isJoining || !joinId.trim()}
                   className="bg-blue-600 text-white px-4 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
                   title={t.join}
+                  aria-label={t.join}
                 >
                   {isJoining ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -340,6 +352,7 @@ export const DirectorModeDialog: React.FC<DirectorModeDialogProps> = ({
                           }}
                           className="absolute -top-2 -right-2 p-1.5 bg-red-600 text-white rounded-full shadow-lg opacity-60 group-hover:opacity-100 transition-opacity hover:bg-red-700"
                           title={t.stopSession}
+                          aria-label={t.stopSession}
                         >
                           <X size={14} />
                         </button>

@@ -338,10 +338,11 @@ export const GuitarTuner: React.FC = () => {
               
               <button
                 onClick={() => playReference(str)}
-                className="mt-1.5 p-1.5 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-blue-600 transition-colors"
+                className="mt-1.5 min-h-11 min-w-11 inline-flex items-center justify-center rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-blue-600 transition-colors"
                 title={`Oír tono de referencia para ${str.label}`}
+                aria-label={`Oír tono de referencia para ${str.label}`}
               >
-                <Volume2 size={13} />
+                <Volume2 size={16} />
               </button>
             </div>
           ))}

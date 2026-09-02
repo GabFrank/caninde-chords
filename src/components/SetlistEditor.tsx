@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Song, Setlist } from '../types';
-import { X, GripVertical, Plus, Search } from 'lucide-react';
+import { X, GripVertical, Plus, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { motion, Reorder, AnimatePresence, useDragControls } from 'motion/react';
 import { translations } from '../translations';
 import { useAuth } from './AuthProvider';
@@ -12,37 +12,87 @@ interface SetlistEditorProps {
   onCancel: () => void;
 }
 
-const SetlistItem: React.FC<{ 
-  id: string; 
-  song: Song; 
+/** Desplaza el contenedor con scroll cuando se arrastra cerca de sus bordes. */
+function autoScroll(el: HTMLElement | null, clientY: number) {
+  let node: HTMLElement | null = el;
+  while (node && node !== document.body) {
+    const canScroll = node.scrollHeight > node.clientHeight &&
+      /auto|scroll/.test(getComputedStyle(node).overflowY);
+    if (canScroll) {
+      const r = node.getBoundingClientRect();
+      const ZONE = 80;
+      if (clientY < r.top + ZONE) node.scrollTop -= Math.max(4, (r.top + ZONE - clientY) / 4);
+      else if (clientY > r.bottom - ZONE) node.scrollTop += Math.max(4, (clientY - (r.bottom - ZONE)) / 4);
+      return;
+    }
+    node = node.parentElement;
+  }
+}
+
+const SetlistItem: React.FC<{
+  id: string;
+  song: Song;
+  index: number;
+  total: number;
   onRemove: (id: string) => void;
+  onMove: (id: string, delta: number) => void;
   t: any;
-}> = ({ id, song, onRemove, t }) => {
+}> = ({ id, song, index, total, onRemove, onMove, t }) => {
   const dragControls = useDragControls();
+  const ref = React.useRef<HTMLLIElement>(null);
 
   return (
-    <Reorder.Item 
+    <Reorder.Item
+      ref={ref}
       value={id}
       dragListener={false}
       dragControls={dragControls}
-      className="p-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl flex items-center gap-4 shadow-sm group relative"
+      // Sin esto, arrastrar más allá del borde visible no hace nada y mover una
+      // canción del final de un setlist largo al principio es imposible.
+      onDrag={(event) => autoScroll(ref.current, (event as PointerEvent).clientY)}
+      className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl flex items-center gap-2 shadow-sm group relative"
     >
-      <div 
+      <div
         onPointerDown={(e) => dragControls.start(e)}
-        className="flex items-center justify-center w-12 h-12 bg-zinc-100 dark:bg-zinc-700 rounded-xl text-zinc-400 cursor-grab active:cursor-grabbing touch-none"
+        className="hidden sm:flex items-center justify-center w-11 h-11 shrink-0 bg-zinc-100 dark:bg-zinc-700 rounded-xl text-zinc-400 cursor-grab active:cursor-grabbing touch-none"
       >
-        <GripVertical size={24} />
-      </div>
-      
-      <div className="flex-1 truncate">
-        <p className="font-bold truncate text-sm md:text-base">{song.title}</p>
-        <p className="text-xs text-zinc-500 truncate">{song.artist}</p>
+        <GripVertical size={22} />
       </div>
 
-      <button 
-        onClick={() => onRemove(id)} 
-        className="w-10 h-10 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
+      <span className="w-7 shrink-0 text-center t-ui-sm font-mono font-bold text-zinc-400 tabular-nums">
+        {index + 1}
+      </span>
+
+      <div className="flex-1 min-w-0">
+        <p className="font-bold truncate t-title">{song.title}</p>
+        <p className="t-meta text-zinc-500 truncate">{song.artist}</p>
+      </div>
+
+      {/* Alternativa al arrastre: en táctil es lo único fiable. */}
+      <div className="flex flex-col shrink-0">
+        <button
+          onClick={() => onMove(id, -1)}
+          disabled={index === 0}
+          aria-label={t.moveUp || 'Subir'}
+          className="w-11 h-6 flex items-center justify-center text-zinc-400 hover:text-blue-500 disabled:opacity-25 rounded-lg transition-all"
+        >
+          <ChevronUp size={18} />
+        </button>
+        <button
+          onClick={() => onMove(id, 1)}
+          disabled={index === total - 1}
+          aria-label={t.moveDown || 'Bajar'}
+          className="w-11 h-6 flex items-center justify-center text-zinc-400 hover:text-blue-500 disabled:opacity-25 rounded-lg transition-all"
+        >
+          <ChevronDown size={18} />
+        </button>
+      </div>
+
+      <button
+        onClick={() => onRemove(id)}
+        className="w-11 h-11 shrink-0 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
         title={t.delete}
+        aria-label={t.delete}
       >
         <X size={20} />
       </button>
@@ -54,6 +104,27 @@ export const SetlistEditor: React.FC<SetlistEditorProps> = ({ initialSetlist, av
   const { profile } = useAuth();
   const t = translations[profile?.language || 'en'];
   const [name, setName] = useState(initialSetlist?.name || '');
+
+  // Escape cierra el buscador de canciones: era el unico modal de esta pantalla
+  // y no habia forma de salir con el teclado.
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsAddingSongs(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const moveSong = React.useCallback((id: string, delta: number) => {
+    setSongIds((prev) => {
+      const from = prev.indexOf(id);
+      const to = from + delta;
+      if (from < 0 || to < 0 || to >= prev.length) return prev;
+      const next = [...prev];
+      next.splice(to, 0, next.splice(from, 1)[0]);
+      return next;
+    });
+  }, []);
   const [songIds, setSongIds] = useState<string[]>(initialSetlist?.songIds || []);
   const [isAddingSongs, setIsAddingSongs] = useState(false);
   const [songSearch, setSongSearch] = useState('');
@@ -124,12 +195,15 @@ export const SetlistEditor: React.FC<SetlistEditorProps> = ({ initialSetlist, av
             const song = availableSongs.find(s => s.id === id);
             if (!song) return null;
             return (
-              <SetlistItem 
-                key={id} 
-                id={id} 
-                song={song} 
-                onRemove={removeSong} 
-                t={t} 
+              <SetlistItem
+                key={id}
+                id={id}
+                song={song}
+                index={songIds.indexOf(id)}
+                total={songIds.length}
+                onRemove={removeSong}
+                onMove={moveSong}
+                t={t}
               />
             );
           })}

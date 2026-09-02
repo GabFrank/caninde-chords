@@ -135,6 +135,7 @@ export const SongEditor: React.FC<SongEditorProps> = ({ initialSong, onSave, onC
                 onClick={() => setShowCapoDialog(true)}
                 className="flex items-center gap-1 px-3 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold transition-all"
                 title={t.capo}
+                aria-label={t.capo}
               >
                 <Hash size={14} />
                 <span>{t.capo}</span>
@@ -143,6 +144,7 @@ export const SongEditor: React.FC<SongEditorProps> = ({ initialSong, onSave, onC
                 onClick={() => setShowChordDialog(true)}
                 className="flex items-center gap-1 px-3 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold transition-all"
                 title={t.chord}
+                aria-label={t.chord}
               >
                 <Music size={14} />
                 <span>{t.chord}</span>
@@ -151,6 +153,7 @@ export const SongEditor: React.FC<SongEditorProps> = ({ initialSong, onSave, onC
                 onClick={() => setShowTagsDialog(true)}
                 className="flex items-center gap-1 px-3 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold transition-all"
                 title={t.repeat}
+                aria-label={t.repeat}
               >
                 <Plus size={14} />
                 <span>Tags</span>

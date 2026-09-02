@@ -1577,6 +1577,7 @@ export default function App() {
                       onClick={() => setShowShareSessionDialog(true)}
                       className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-full text-zinc-500 transition-colors"
                       title={t.shareSession}
+                      aria-label={t.shareSession}
                     >
                       <Share2 size={13} />
                     </button>
@@ -1593,6 +1594,7 @@ export default function App() {
                     }}
                     className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 rounded-full transition-colors"
                     title={isDirector ? t.stopSession : t.leaveSession}
+                    aria-label={isDirector ? t.stopSession : t.leaveSession}
                   >
                     <XCircle size={14} />
                   </button>
@@ -1675,6 +1677,7 @@ export default function App() {
                       onClick={() => { setSelectedSetlist(null); setCurrentSetlistIndex(0); }}
                       className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
                       title={t.back}
+                      aria-label={t.back}
                     >
                       <ChevronRight className="rotate-180" size={16} />
                     </button>
@@ -1688,6 +1691,7 @@ export default function App() {
                       onClick={() => setListVisible(false)}
                       className={`${isCompact ? '' : 'hidden'} p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors`}
                       title={t.back}
+                      aria-label={t.back}
                     >
                       <ChevronLeft size={16} />
                     </button>
@@ -1695,6 +1699,7 @@ export default function App() {
                       onClick={() => setIsEditing(true)}
                       className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
                       title={t.edit}
+                      aria-label={t.edit}
                     >
                       <Edit2 size={14} />
                     </button>
@@ -1702,6 +1707,7 @@ export default function App() {
                       onClick={() => setShareModal({ isOpen: true, type: 'setlists', id: selectedSetlist.id, title: selectedSetlist.name })}
                       className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
                       title={t.share}
+                      aria-label={t.share}
                     >
                       <Share2 size={14} />
                     </button>
@@ -1709,6 +1715,7 @@ export default function App() {
                       onClick={() => setShowDirectorDialog(true)}
                       className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg transition-all ${activeSession ? 'text-blue-600 bg-blue-600/10' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500'}`}
                       title={t.directorMode}
+                      aria-label={t.directorMode}
                     >
                       <Radio size={14} className={activeSession ? 'animate-pulse' : ''} />
                     </button>
@@ -1877,6 +1884,7 @@ export default function App() {
                           onClick={() => setIsImportModalOpen(true)}
                           className="min-h-11 min-w-11 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-center gap-1.5 text-zinc-500 hover:border-blue-500 hover:text-blue-500 transition-all"
                           title={t.import}
+                          aria-label={t.import}
                         >
                           <Upload size={16} />
                         </button>
@@ -1993,6 +2001,7 @@ export default function App() {
                           disabled={!canEdit}
                           className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed" 
                           title={t.edit}
+                          aria-label={t.edit}
                         >
                           <Edit2 size={16} />
                         </button>
@@ -2000,6 +2009,7 @@ export default function App() {
                           onClick={() => setCollabModal({ isOpen: true, type: activeTab, id: (selectedSong?.id || selectedSetlist?.id)! })} 
                           className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg" 
                           title={t.addCollaborator}
+                          aria-label={t.addCollaborator}
                         >
                           <UserPlus size={16} />
                         </button>
@@ -2012,6 +2022,7 @@ export default function App() {
                           })} 
                           className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg" 
                           title={t.share}
+                          aria-label={t.share}
                         >
                           <Share2 size={16} />
                         </button>
@@ -2019,6 +2030,7 @@ export default function App() {
                           onClick={() => setConfirmModal({ type: activeTab, id: (selectedSong?.id || selectedSetlist?.id)! })} 
                           className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-red-500" 
                           title={((selectedSong?.ownerId === user?.uid) || (selectedSetlist?.ownerId === user?.uid)) ? t.delete : t.remove}
+                          aria-label={((selectedSong?.ownerId === user?.uid) || (selectedSetlist?.ownerId === user?.uid)) ? t.delete : t.remove}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -2068,6 +2080,7 @@ export default function App() {
                           }}
                           className={`flex items-center gap-1.5 px-2 min-h-9 rounded-lg transition-all font-bold t-ui-sm ${autoResize ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}
                           title={t.autoResize}
+                          aria-label={t.autoResize}
                         >
                           <Maximize size={14} />
                           <div className={`w-6 h-3 rounded-full transition-all relative ${autoResize ? 'bg-blue-400' : 'bg-zinc-300 dark:bg-zinc-700'}`}>
@@ -2119,6 +2132,7 @@ export default function App() {
                           disabled={!hasPendingSongChanges}
                           className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg transition-all ${hasPendingSongChanges ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400 opacity-50 cursor-not-allowed'}`}
                           title={t.save}
+                          aria-label={t.save}
                         >
                           <Save size={16} />
                         </button>

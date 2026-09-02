@@ -24,8 +24,16 @@ export const QRScanner: React.FC<QRScannerProps> = ({ onScan, onClose }) => {
           { facingMode: "environment" },
           {
             fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0
+            // El recuadro visible es min(70vmin, 280px): si el área real de
+            // escaneo queda fija en 250px, el usuario apunta a un marco que no
+            // coincide con lo que la cámara mira. Se calcula igual, y se deja
+            // que la relación de aspecto la ponga el dispositivo en vez de
+            // forzar 1:1 sobre un contenedor apaisado.
+            qrbox: () => {
+              const side = Math.round(Math.min(window.innerWidth, window.innerHeight) * 0.7);
+              const clamped = Math.max(160, Math.min(side, 280));
+              return { width: clamped, height: clamped };
+            },
           },
           (decodedText) => {
             let finalId = decodedText;
