@@ -97,10 +97,14 @@ for (const vp of VIEWPORTS) {
     if (m.type() === 'error' && !/firestore|Firebase|net::ERR|Failed to load resource/i.test(t)) jsErrors.push('console: ' + t);
   });
 
-  // Firestore no es alcanzable desde CI y sus peticiones quedan colgadas 10s.
-  // Se abortan para que fallen rápido: la app tiene que renderizar igual, sin
-  // perfil, que es justamente una de las garantías que se quiere proteger.
-  await page.route('**/*firestore.googleapis.com/**', (r) => r.abort());
+  // La prueba es hermética: se bloquea todo lo que no venga del servidor local.
+  // Si Firebase puede salir a la red, intenta refrescar el token sembrado, falla
+  // y cierra la sesión, con lo que la app vuelve al formulario de acceso y la
+  // prueba mide otra cosa. Sin red, Firebase conserva la sesión persistida y la
+  // app renderiza sin perfil, que es justamente una de las garantías a proteger.
+  await page.route('**/*', (route) =>
+    route.request().url().startsWith(BASE) ? route.continue() : route.abort(),
+  );
 
   // Primero se carga la app para que Firebase cree su base, después se siembra
   // la sesión y se recarga: addInitScript no espera la promesa de IndexedDB.
