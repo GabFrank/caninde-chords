@@ -40,6 +40,18 @@ jobs:
       - name: Test (Harmony Engine)
         run: npm test
 
+      # Compuerta de interfaz: levanta la app compilada en Chromium y falla si
+      # hay errores de JS, si no renderiza, si el modo de layout no corresponde
+      # o si algo desborda. Va ANTES del release para que un fallo no deje una
+      # versión publicada sin desplegar. `tsc` y los tests unitarios no ven
+      # errores de runtime: una pantalla en blanco llegó a producción pasando
+      # lint, tests y dos revisiones de código.
+      - name: Instalar Chromium para la prueba de humo
+        run: npx playwright install --with-deps chromium
+
+      - name: Prueba de humo de la interfaz
+        run: npm run build && npm run smoke
+
       - name: Semantic Release (versionado automático)
         run: npx semantic-release
         env:

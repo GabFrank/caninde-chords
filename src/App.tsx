@@ -1495,7 +1495,7 @@ export default function App() {
       
       {/* Header */}
       {!isFullScreen && (
-        <header className="p-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-inherit z-10 safe-area-top safe-area-x">
+        <header className={`${isCompact && isLandscape ? 'py-1' : 'p-2'} px-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-inherit z-10 safe-area-top safe-area-x`}>
           <div className="flex items-center gap-2">
             <img 
               src={getLogoUrl()} 
@@ -1575,7 +1575,7 @@ export default function App() {
                   {isDirector && (
                     <button 
                       onClick={() => setShowShareSessionDialog(true)}
-                      className="p-1 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-full text-zinc-500 transition-colors"
+                      className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-full text-zinc-500 transition-colors"
                       title={t.shareSession}
                     >
                       <Share2 size={13} />
@@ -1591,7 +1591,7 @@ export default function App() {
                     onClick={() => {
                       window.dispatchEvent(new CustomEvent('session-action', { detail: isDirector ? 'stop' : 'leave' }));
                     }}
-                    className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 rounded-full transition-colors"
+                    className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 rounded-full transition-colors"
                     title={isDirector ? t.stopSession : t.leaveSession}
                   >
                     <XCircle size={14} />
@@ -1673,7 +1673,7 @@ export default function App() {
                   <div className="flex items-center gap-1.5">
                     <button 
                       onClick={() => { setSelectedSetlist(null); setCurrentSetlistIndex(0); }}
-                      className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
+                      className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
                       title={t.back}
                     >
                       <ChevronRight className="rotate-180" size={16} />
@@ -1693,21 +1693,21 @@ export default function App() {
                     </button>
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
+                      className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
                       title={t.edit}
                     >
                       <Edit2 size={14} />
                     </button>
                     <button 
                       onClick={() => setShareModal({ isOpen: true, type: 'setlists', id: selectedSetlist.id, title: selectedSetlist.name })}
-                      className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
+                      className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
                       title={t.share}
                     >
                       <Share2 size={14} />
                     </button>
                     <button 
                       onClick={() => setShowDirectorDialog(true)}
-                      className={`p-1.5 rounded-lg transition-all ${activeSession ? 'text-blue-600 bg-blue-600/10' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500'}`}
+                      className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg transition-all ${activeSession ? 'text-blue-600 bg-blue-600/10' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500'}`}
                       title={t.directorMode}
                     >
                       <Radio size={14} className={activeSession ? 'animate-pulse' : ''} />
@@ -1729,7 +1729,7 @@ export default function App() {
                 </div>
 
                 <div className="flex-1 min-h-0 overflow-y-auto touch-scrolling px-1 py-2">
-                  <div className="space-y-0.5">
+                  <div className={isCompact && isLandscape ? 'grid grid-cols-2 gap-x-2 gap-y-0.5' : 'space-y-0.5'}>
                     {selectedSetlist.songIds
                       .map((id, i) => ({ song: songs.find(s => s.id === id), originalIndex: i, id }))
                       .filter(item => 
@@ -1841,7 +1841,7 @@ export default function App() {
  
                 <div className={`flex-1 min-h-0 overflow-auto touch-scrolling px-1 ${isCompact ? 'pb-20' : 'pb-4'}`}>
                   {activeTab === 'songs' ? (
-                    <div className="space-y-0.5">
+                    <div className={isCompact && isLandscape ? 'grid grid-cols-2 gap-x-2 gap-y-0.5' : 'space-y-0.5'}>
                       {filteredSongs.map(song => (
                         <button
                           key={song.id}
@@ -1868,14 +1868,14 @@ export default function App() {
                       <div className="flex gap-1.5 mt-2">
                         <button 
                           onClick={() => { setSelectedSong(null); setSelectedSetlist(null); setIsEditing(true); }}
-                          className="flex-1 p-2 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-center gap-1.5 text-zinc-500 hover:border-blue-500 hover:text-blue-500 transition-all text-xs"
+                          className="flex-1 min-h-11 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-center gap-1.5 text-zinc-500 hover:border-blue-500 hover:text-blue-500 transition-all t-ui"
                         >
                           <Plus size={16} />
                           {t.newSong}
                         </button>
                         <button 
                           onClick={() => setIsImportModalOpen(true)}
-                          className="p-2 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-center gap-1.5 text-zinc-500 hover:border-blue-500 hover:text-blue-500 transition-all"
+                          className="min-h-11 min-w-11 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-center gap-1.5 text-zinc-500 hover:border-blue-500 hover:text-blue-500 transition-all"
                           title={t.import}
                         >
                           <Upload size={16} />
@@ -1883,7 +1883,7 @@ export default function App() {
                       </div>
                     </div>
                   ) : activeTab === 'setlists' ? (
-                    <div className="space-y-0.5">
+                    <div className={isCompact && isLandscape ? 'grid grid-cols-2 gap-x-2 gap-y-0.5' : 'space-y-0.5'}>
                       {filteredSetlists.map(setlist => (
                         <button
                           key={setlist.id}
@@ -1991,14 +1991,14 @@ export default function App() {
                         <button 
                           onClick={() => setIsEditing(true)} 
                           disabled={!canEdit}
-                          className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed" 
+                          className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed" 
                           title={t.edit}
                         >
                           <Edit2 size={16} />
                         </button>
                         <button 
                           onClick={() => setCollabModal({ isOpen: true, type: activeTab, id: (selectedSong?.id || selectedSetlist?.id)! })} 
-                          className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg" 
+                          className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg" 
                           title={t.addCollaborator}
                         >
                           <UserPlus size={16} />
@@ -2010,14 +2010,14 @@ export default function App() {
                             id: (selectedSong?.id || selectedSetlist?.id)!,
                             title: selectedSong?.title || selectedSetlist?.name || ''
                           })} 
-                          className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg" 
+                          className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg" 
                           title={t.share}
                         >
                           <Share2 size={16} />
                         </button>
                         <button 
                           onClick={() => setConfirmModal({ type: activeTab, id: (selectedSong?.id || selectedSetlist?.id)! })} 
-                          className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-red-500" 
+                          className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-red-500" 
                           title={((selectedSong?.ownerId === user?.uid) || (selectedSetlist?.ownerId === user?.uid)) ? t.delete : t.remove}
                         >
                           <Trash2 size={16} />
@@ -2026,7 +2026,7 @@ export default function App() {
  
                       <button
                         onClick={toggleFullScreen}
-                        className={`p-1.5 rounded-lg transition-all ${isFullScreen ? 'bg-blue-600 text-white' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+                        className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg transition-all ${isFullScreen ? 'bg-blue-600 text-white' : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
                         title={t.fullscreen}
                         aria-label={t.fullscreen}
                       >
@@ -2035,7 +2035,7 @@ export default function App() {
 
                       <button 
                         onClick={() => setIsToolbarExpanded(!isToolbarExpanded)}
-                        className={`p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg ${isCompact ? '' : 'hidden'}`}
+                        className={`min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg ${isCompact ? '' : 'hidden'}`}
                       >
                         <ChevronDown size={16} className={`transition-transform duration-200 ${isToolbarExpanded ? 'rotate-180 text-blue-500' : ''}`} />
                       </button>
@@ -2047,7 +2047,7 @@ export default function App() {
                           <button onClick={() => {
                             setTranspose(prev => prev - 1);
                             setHasPendingSongChanges(true);
-                          }} className="px-1.5 py-0.5 hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm text-[10px] font-bold">-</button>
+                          }} className="min-h-9 min-w-9 inline-flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm t-ui-sm font-bold">-</button>
                           <div className="flex items-center gap-1 px-1 text-blue-600">
                             <Music size={12} />
                             <span className="text-[9px] font-mono w-6 text-center">{transpose > 0 ? `+${transpose}` : transpose}</span>
@@ -2055,7 +2055,7 @@ export default function App() {
                           <button onClick={() => {
                             setTranspose(prev => prev + 1);
                             setHasPendingSongChanges(true);
-                          }} className="px-1.5 py-0.5 hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm text-[10px] font-bold">+</button>
+                          }} className="min-h-9 min-w-9 inline-flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm t-ui-sm font-bold">+</button>
                         </div>
 
                         {/* Auto Resize Toggle */}
@@ -2066,7 +2066,7 @@ export default function App() {
                             setHasPendingSongChanges(true);
                             if (newVal) window.dispatchEvent(new CustomEvent('fit-to-screen'));
                           }}
-                          className={`flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all font-bold text-[10px] ${autoResize ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}
+                          className={`flex items-center gap-1.5 px-2 min-h-9 rounded-lg transition-all font-bold t-ui-sm ${autoResize ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'}`}
                           title={t.autoResize}
                         >
                           <Maximize size={14} />
@@ -2080,12 +2080,12 @@ export default function App() {
                           <button onClick={() => {
                             setFontSize(prev => Math.max(8, prev - 1));
                             setHasPendingSongChanges(true);
-                          }} className="px-1.5 py-0.5 hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm text-[10px]">-</button>
+                          }} className="min-h-9 min-w-9 inline-flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm t-ui-sm">-</button>
                           <span className="px-1.5 text-[10px] font-mono">{fontSize}</span>
                           <button onClick={() => {
                             setFontSize(prev => Math.min(48, prev + 1));
                             setHasPendingSongChanges(true);
-                          }} className="px-1.5 py-0.5 hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm text-[10px]">+</button>
+                          }} className="min-h-9 min-w-9 inline-flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm t-ui-sm">+</button>
                         </div>
                         
                         {/* Columns */}
@@ -2096,7 +2096,7 @@ export default function App() {
                               setHasPendingSongChanges(true);
                               if (autoResize) window.dispatchEvent(new CustomEvent('fit-to-screen'));
                             }} 
-                            className="px-1.5 py-0.5 hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm text-[10px]"
+                            className="min-h-9 min-w-9 inline-flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm t-ui-sm"
                           >
                             -
                           </button>
@@ -2107,7 +2107,7 @@ export default function App() {
                               setHasPendingSongChanges(true);
                               if (autoResize) window.dispatchEvent(new CustomEvent('fit-to-screen'));
                             }} 
-                            className="px-1.5 py-0.5 hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm text-[10px]"
+                            className="min-h-9 min-w-9 inline-flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm t-ui-sm"
                           >
                             +
                           </button>
@@ -2117,7 +2117,7 @@ export default function App() {
                         <button 
                           onClick={saveCurrentSongSettings}
                           disabled={!hasPendingSongChanges}
-                          className={`p-1.5 rounded-lg transition-all ${hasPendingSongChanges ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400 opacity-50 cursor-not-allowed'}`}
+                          className={`min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg transition-all ${hasPendingSongChanges ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400 opacity-50 cursor-not-allowed'}`}
                           title={t.save}
                         >
                           <Save size={16} />
@@ -2231,31 +2231,31 @@ export default function App() {
         <nav className={`${isCompact ? 'flex' : 'hidden'} flex-none border-t border-zinc-200 dark:border-zinc-800 p-2 justify-around bg-white dark:bg-zinc-950 safe-area-x pb-[max(0.5rem,env(safe-area-inset-bottom))]`}>
             <button 
               onClick={() => { setActiveTab('songs'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
-              className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === 'songs' && !selectedSong && !selectedSetlist && !isEditing ? 'text-blue-500' : 'text-zinc-500'}`}
+              className={`flex flex-col items-center rounded-xl transition-all ${isCompact && isLandscape ? 'px-3 py-1' : 'p-2'} ${activeTab === 'songs' && !selectedSong && !selectedSetlist && !isEditing ? 'text-blue-500' : 'text-zinc-500'}`}
             >
               <Music size={24} />
-              <span className="t-ui-sm font-bold mt-1">{t.songs}</span>
+              <span className={`t-ui-sm font-bold mt-1 ${isCompact && isLandscape ? 'hidden' : ''}`}>{t.songs}</span>
             </button>
             <button 
               onClick={() => { setActiveTab('setlists'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
-              className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === 'setlists' && !selectedSong && !selectedSetlist && !isEditing ? 'text-blue-500' : 'text-zinc-500'}`}
+              className={`flex flex-col items-center rounded-xl transition-all ${isCompact && isLandscape ? 'px-3 py-1' : 'p-2'} ${activeTab === 'setlists' && !selectedSong && !selectedSetlist && !isEditing ? 'text-blue-500' : 'text-zinc-500'}`}
             >
               <List size={24} />
-              <span className="t-ui-sm font-bold mt-1">{t.setlists}</span>
+              <span className={`t-ui-sm font-bold mt-1 ${isCompact && isLandscape ? 'hidden' : ''}`}>{t.setlists}</span>
             </button>
             <button 
               onClick={() => { setActiveTab('utilities'); setSelectedSong(null); setSelectedSetlist(null); setIsEditing(false); }}
-              className={`flex flex-col items-center p-2 rounded-xl transition-all ${activeTab === 'utilities' ? 'text-blue-500' : 'text-zinc-500'}`}
+              className={`flex flex-col items-center rounded-xl transition-all ${isCompact && isLandscape ? 'px-3 py-1' : 'p-2'} ${activeTab === 'utilities' ? 'text-blue-500' : 'text-zinc-500'}`}
             >
               <Compass size={24} />
-              <span className="t-ui-sm font-bold mt-1">{t.utilities}</span>
+              <span className={`t-ui-sm font-bold mt-1 ${isCompact && isLandscape ? 'hidden' : ''}`}>{t.utilities}</span>
             </button>
             <button 
               onClick={() => { setSelectedSong(null); setSelectedSetlist(null); setIsEditing(true); }}
               className={`flex flex-col items-center p-2 rounded-xl transition-all ${isEditing ? 'text-blue-500' : 'text-zinc-500'}`}
             >
               <Plus size={24} />
-              <span className="t-ui-sm font-bold mt-1">{t.new}</span>
+              <span className={`t-ui-sm font-bold mt-1 ${isCompact && isLandscape ? 'hidden' : ''}`}>{t.new}</span>
             </button>
             {deferredPrompt && (
               <button 
@@ -2263,7 +2263,7 @@ export default function App() {
                 className="flex flex-col items-center p-2 text-blue-600 animate-pulse"
               >
                 <Plus size={24} className="bg-blue-600 text-white rounded-full p-1" />
-                <span className="t-ui-sm font-bold mt-1">{t.install || 'Install'}</span>
+                <span className={`t-ui-sm font-bold mt-1 ${isCompact && isLandscape ? 'hidden' : ''}`}>{t.install || 'Install'}</span>
               </button>
             )}
           </nav>
