@@ -1,3 +1,15 @@
+# [2.16.0](https://github.com/GabFrank/caninde-chords/compare/v2.15.2...v2.16.0) (2026-09-02)
+
+
+### Bug Fixes
+
+* **ci:** aislar la prueba de humo de la red ([59420da](https://github.com/GabFrank/caninde-chords/commit/59420da2542f8f58919bcc3d046b69622feeadbd))
+
+
+### Features
+
+* **ci:** prueba de humo de interfaz, piso tactil completo y densidad en horizontal ([631fe27](https://github.com/GabFrank/caninde-chords/commit/631fe27a3183b89168fb4535cb35d21e353de3d4))
+
 ## [2.15.2](https://github.com/GabFrank/caninde-chords/compare/v2.15.1...v2.15.2) (2026-09-01)
 
 
