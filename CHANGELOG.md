@@ -1,3 +1,10 @@
+# [2.17.0](https://github.com/GabFrank/caninde-chords/compare/v2.16.0...v2.17.0) (2026-09-02)
+
+
+### Features
+
+* **ui:** reordenar setlists sin arrastrar, y accesibilidad pendiente ([3a84084](https://github.com/GabFrank/caninde-chords/commit/3a8408440c0a4aa5c6f874ca7f05a8733c79a7ac))
+
 # [2.16.0](https://github.com/GabFrank/caninde-chords/compare/v2.15.2...v2.16.0) (2026-09-02)
 
 
