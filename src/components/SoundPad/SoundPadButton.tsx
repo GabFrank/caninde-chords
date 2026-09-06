@@ -26,6 +26,8 @@ interface SoundPadButtonProps {
   onToggleFavorite: (pad: SoundPad) => void;
   /** Pantalla de poco alto (teléfono apaisado): pad más bajo, sin insignias. */
   dense?: boolean;
+  /** Tecla que lo dispara, si le tocó una de las diez primeras posiciones. */
+  shortcut?: string | null;
   labels: {
     favorite: string;
     edit: string;
@@ -41,7 +43,8 @@ interface SoundPadButtonProps {
 const DRAG_PX = 10;
 
 export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
-  pad, playing, progress, missing, onTrigger, onStop, onRetract, onEdit, onToggleFavorite, labels, dense = false,
+  pad, playing, progress, missing, onTrigger, onStop, onRetract, onEdit, onToggleFavorite, labels,
+  dense = false, shortcut = null,
 }) => {
   const color = padColor(pad.color);
   const Icon = padIcon(pad.icon);
@@ -132,6 +135,16 @@ export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
         style={{ touchAction: 'pan-y' }}
       >
         <Icon size={dense ? 16 : 22} className="shrink-0" />
+        {/* La tecla que lo dispara, abajo a la izquierda: en un tablero de
+            veinte sonidos es la diferencia entre buscar y disparar. */}
+        {shortcut && (
+          <span
+            aria-hidden="true"
+            className="absolute bottom-1 left-1.5 text-[9px] font-mono font-black opacity-40 tabular-nums"
+          >
+            {shortcut}
+          </span>
+        )}
         <span className="text-[11px] font-black leading-tight line-clamp-2 break-words w-full">
           {pad.name}
         </span>

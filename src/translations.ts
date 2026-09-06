@@ -213,6 +213,18 @@ export const translations = {
     soundpadArrangeDone: 'Done',
     soundpadArrangeHint: 'Drag by the handle or use the arrows. Pads do not play while arranging.',
     soundpadArrangeEmpty: 'Add at least two sounds to arrange them.',
+    soundpadShortcuts: 'Shortcuts',
+    soundpadShortcutsHint: 'Keys 1-9 and 0 fire the first ten pads on screen. Escape stops everything.',
+    soundpadMidi: 'MIDI',
+    soundpadMidiEnable: 'Enable MIDI',
+    soundpadMidiUnsupported: 'This browser has no Web MIDI (Safari does not support it).',
+    soundpadMidiDenied: 'MIDI access was denied.',
+    soundpadMidiNoDevices: 'No controller detected. Plug it in and it appears here.',
+    soundpadMidiNote: 'MIDI note',
+    soundpadMidiLearn: 'Learn',
+    soundpadMidiLearning: 'Press a key on your controller…',
+    soundpadMidiClear: 'Unassign',
+    soundpadMidiNone: 'Not assigned',
     utilitiesBlurb: 'Ceremony sounds and instrument tuner.'
   },
   es: {
@@ -424,6 +436,18 @@ export const translations = {
     soundpadArrangeDone: 'Listo',
     soundpadArrangeHint: 'Arrastrá desde el asa o usá las flechas. Mientras organizás, los pads no suenan.',
     soundpadArrangeEmpty: 'Agregá al menos dos sonidos para poder ordenarlos.',
+    soundpadShortcuts: 'Atajos',
+    soundpadShortcutsHint: 'Las teclas 1-9 y 0 disparan los diez primeros pads en pantalla. Escape para todo.',
+    soundpadMidi: 'MIDI',
+    soundpadMidiEnable: 'Activar MIDI',
+    soundpadMidiUnsupported: 'Este navegador no tiene Web MIDI (Safari no lo soporta).',
+    soundpadMidiDenied: 'Se denegó el acceso a MIDI.',
+    soundpadMidiNoDevices: 'No se detectó ningún controlador. Enchufalo y aparece acá.',
+    soundpadMidiNote: 'Nota MIDI',
+    soundpadMidiLearn: 'Aprender',
+    soundpadMidiLearning: 'Tocá una tecla del controlador…',
+    soundpadMidiClear: 'Quitar',
+    soundpadMidiNone: 'Sin asignar',
     utilitiesBlurb: 'Sonidos de la ceremonia y afinador de instrumentos.'
   }
 };

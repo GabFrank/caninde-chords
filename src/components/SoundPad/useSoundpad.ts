@@ -208,7 +208,12 @@ export function useSoundpad() {
   const updatePad = useCallback(async (pad: SoundPad, changes: Partial<PadDraft>, file?: File) => {
     if (!user) return;
     setError(null);
-    const patch: Record<string, unknown> = { ...changes, updatedAt: serverTimestamp() };
+    // Firestore rechaza los `undefined`: un campo opcional que se vacía —quitarle
+    // la nota MIDI a un pad, por ejemplo— se BORRA, no se manda como undefined.
+    const patch: Record<string, unknown> = { updatedAt: serverTimestamp() };
+    for (const [k, v] of Object.entries(changes)) {
+      patch[k] = v === undefined ? deleteField() : v;
+    }
     if (file) {
       try {
         const newKey = makeFileKey(file.name);

@@ -119,6 +119,8 @@ export interface SoundPad {
   overlay: boolean;
   /** Milisegundos de fundido al ser cortado por un pad exclusivo o por pánico. */
   fadeOutMs?: number;
+  /** Nota MIDI que dispara este pad (0-127). Se asigna con "aprender". */
+  midiNote?: number;
   favorite: boolean;
   order: number;
   createdAt: any;

@@ -373,9 +373,38 @@ await page.waitForTimeout(400);
 await page.locator('[data-pad-id]').first().focus();
 await page.keyboard.press('Enter');
 await page.waitForTimeout(500);
-check('un pad se dispara con el teclado', await countPlaying() === 1, `activos: ${await countPlaying()}`);
+check('un pad enfocado se dispara con Enter', await countPlaying() === 1, `activos: ${await countPlaying()}`);
 await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
 await page.waitForTimeout(400);
+
+// (c2) Atajos globales: las teclas 1-9 disparan por posición, Escape es el pánico.
+await page.locator('body').click({ position: { x: 5, y: 5 } });
+await page.keyboard.press('2');
+await page.waitForTimeout(500);
+const segundoId = (await idsDePads())[1];
+const sonando = await page.evaluate(() =>
+  [...document.querySelectorAll('[data-pad-id][data-playing="true"]')].map(el => el.getAttribute('data-pad-id')));
+check('la tecla 2 dispara el segundo pad de la pantalla',
+  sonando.length === 1 && sonando[0] === segundoId, `sonando: ${sonando.join(',')}`);
+
+await page.keyboard.press('Escape');
+await page.waitForTimeout(500);
+check('Escape para todo', await countPlaying() === 0);
+
+// Escribiendo en un campo, los números no pueden disparar nada.
+await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
+await page.waitForTimeout(400);
+await page.locator('#pad-name').fill('Trueno 3');
+await page.waitForTimeout(300);
+check('escribir un número en un campo no dispara ningún pad', await countPlaying() === 0);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(400);
+check('Escape con el modal abierto lo cierra en vez de disparar el pánico',
+  await page.locator('#pad-name').count() === 0);
+
+// La tecla asignada se ve en el pad, o no sirve de nada.
+check('el pad muestra su tecla', await page.evaluate(() =>
+  document.querySelector('[data-pad-id]')?.textContent?.includes('1') ?? false));
 
 // (d) Un bucle no puede quedar sonando fuera del control de la interfaz.
 // El motor sobrevive al desmontaje del tablero: al volver de otra pestaña, la

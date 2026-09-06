@@ -50,6 +50,8 @@ arregla revinculando el archivo o importando el pack `.zip`.
 | `src/components/SoundPad/CategoryManager.tsx` | ABM de categorías |
 | `src/components/SoundPad/PadArranger.tsx` | Modo organizar: reordenar los pads |
 | `src/lib/padOrder.ts` | Reparto de los valores de `order` al reordenar |
+| `src/lib/padShortcuts.ts` | Atajos de teclado |
+| `src/services/midi.ts` | Web MIDI: permiso, controladores y notas |
 
 Las interfaces `SoundPad` y `SoundCategory` están en `src/types.ts`; las reglas
 de acceso, en `firestore.rules`.
@@ -160,7 +162,31 @@ Al guardar se reparten **sólo los valores de `order` que esos pads ya ocupaban*
 acomodar los sonidos de una categoría no mueve a los de las demás, que es lo que
 uno espera cuando filtró antes de ordenar.
 
-### 11. iOS suspende el audio con la pantalla bloqueada
+### 11. Disparar sin tocar la pantalla
+
+**Teclado:** las teclas `1`-`9` y `0` disparan los diez primeros pads *de lo que
+se esté viendo* —el filtro y el modo Organizar deciden cuáles son— y `Escape` es
+el pánico. La tecla se muestra en la esquina del pad.
+
+Tres reglas que no son opcionales (`resolveShortcut` las concentra, con pruebas):
+no disparar mientras se escribe (escribir "Trueno 3" en el nombre de un pad haría
+sonar el tercero), ignorar las combinaciones con Ctrl/Cmd/Alt, y no repetir el
+disparo mientras la tecla sigue apretada. Y con un modal abierto, `Escape` le
+pertenece al modal: si además hiciera pánico, cerrar el editor callaría el sonido
+que se estaba probando.
+
+**MIDI:** cada pad puede tener una `midiNote` asignada con "Aprender" —la próxima
+nota que llegue del controlador queda tomada—, que es la única forma razonable de
+mapear un pedal sin pedirle al usuario que sepa qué número de nota manda su
+aparato. Un `noteon` con velocidad 0 se trata como `noteoff`: así lo mandan
+muchos controladores, y tomarlo por un disparo haría sonar el pad también al
+**soltar** el pedal.
+
+El permiso de Web MIDI se pide sólo cuando el usuario enciende MIDI, nunca al
+abrir el tablero. Safari no implementa la API: ahí la sección se reemplaza por un
+aviso y el resto funciona igual.
+
+### 12. iOS suspende el audio con la pantalla bloqueada
 
 En PWA instalada, iOS suspende el `AudioContext` al bloquear la pantalla o pasar
 a segundo plano. Mitigación: Screen Wake Lock mientras el tablero está abierto, y

@@ -7,9 +7,9 @@ Acordado con el usuario, en este orden:
 - [x] **Reordenar pads.** Resuelto con un modo "Organizar" aparte, no con un
   gesto sobre el tablero: arrastrar un pad ya significa "retirá el sonido". Ver
   gotcha 10 de [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
-- [ ] **Atajos de teclado y MIDI.** Disparar pads con las teclas 1-9, un pedal
-  Bluetooth o un controlador MIDI (Web MIDI API), sin tocar la pantalla. La base
-  ya está: los pads responden a Enter y Espacio.
+- [x] **Atajos de teclado y MIDI.** Teclas 1-9/0 por posición, Escape para el
+  pánico, y nota MIDI por pad con "Aprender". Ver gotcha 11 de
+  [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
 
 Más adelante, sin fecha:
 

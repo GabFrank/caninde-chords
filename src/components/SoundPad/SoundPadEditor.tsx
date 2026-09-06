@@ -1,12 +1,13 @@
 // Alta y edición de un pad: archivo, identidad visual y comportamiento al sonar.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Upload, Play, Square, Trash2, Layers, Scissors, Infinity as InfinityIcon } from 'lucide-react';
+import { Upload, Play, Square, Trash2, Layers, Scissors, Infinity as InfinityIcon, Radio, X } from 'lucide-react';
 import { Modal } from '../Modal';
 import { SoundCategory, SoundPad } from '../../types';
 import { Strings } from '../../translations';
 import { ACCEPTED_AUDIO, formatBytes, formatDuration } from '../../services/soundLibrary';
 import { MAX_REPEAT } from '../../services/soundpadEngine';
+import { midiService, midiNoteName } from '../../services/midi';
 import {
   DEFAULT_COLOR_ID, DEFAULT_ICON_ID, SOUNDPAD_COLORS, SOUNDPAD_ICONS, UNCATEGORIZED_ID, padIcon,
 } from '../../lib/soundpadStyles';
@@ -40,6 +41,7 @@ const emptyDraft = {
   overlay: true,
   fadeOutMs: 120,
   favorite: false,
+  midiNote: undefined as number | undefined,
 };
 
 export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
@@ -51,6 +53,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [learning, setLearning] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -68,8 +71,22 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
       overlay: pad.overlay,
       fadeOutMs: pad.fadeOutMs ?? 120,
       favorite: pad.favorite,
+      midiNote: pad.midiNote,
     } : { ...emptyDraft });
+    setLearning(false);
   }, [open, pad]);
+
+  // "Aprender": la próxima nota que llegue del controlador queda asignada. Es la
+  // única forma razonable de mapear un pedal o un pad físico sin pedirle al
+  // usuario que sepa qué número de nota manda su aparato.
+  useEffect(() => {
+    if (!learning) return;
+    const off = midiService.subscribe(({ note }) => {
+      setDraft(d => ({ ...d, midiNote: note }));
+      setLearning(false);
+    });
+    return off;
+  }, [learning]);
 
   const pickFile = (f: File | null) => {
     if (!f) return;
@@ -268,6 +285,37 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
             className="w-28 min-h-11 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-blue-500 outline-none text-sm font-bold"
           />
         </div>
+
+        {/* MIDI: sólo si el usuario ya activó el acceso desde el tablero. */}
+        {midiService.enabled && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{t.soundpadMidiNote}</label>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-mono text-zinc-600 dark:text-zinc-400 min-w-[90px]">
+                {draft.midiNote === undefined ? t.soundpadMidiNone : midiNoteName(draft.midiNote)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setLearning(v => !v)}
+                aria-pressed={learning}
+                className={`min-h-11 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors ${learning ? 'bg-blue-600 text-white animate-pulse' : 'bg-zinc-100 dark:bg-zinc-800'}`}
+              >
+                <Radio size={14} />
+                {learning ? t.soundpadMidiLearning : t.soundpadMidiLearn}
+              </button>
+              {draft.midiNote !== undefined && (
+                <button
+                  type="button"
+                  onClick={() => setDraft(d => ({ ...d, midiNote: undefined }))}
+                  aria-label={t.soundpadMidiClear}
+                  className="min-h-11 min-w-11 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-500"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {formError && (
           <p className="text-xs text-red-600 font-bold" role="alert">{formError}</p>

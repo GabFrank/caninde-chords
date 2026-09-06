@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Search, Square, Star, Tags, Volume2, HardDrive, AlertTriangle, X,
-  Download, Upload, ArrowUpDown,
+  Download, Upload, ArrowUpDown, Keyboard, Radio,
 } from 'lucide-react';
 import { useAuth } from '../AuthProvider';
 import { useViewport } from '../../lib/useViewport';
@@ -15,6 +15,8 @@ import { SoundPad } from '../../types';
 import { translations, Strings } from '../../translations';
 import { formatBytes } from '../../services/soundLibrary';
 import { padColor, UNCATEGORIZED_ID } from '../../lib/soundpadStyles';
+import { resolveShortcut, shortcutKeyFor } from '../../lib/padShortcuts';
+import { midiService, isMidiSupported } from '../../services/midi';
 import { useSoundpad } from './useSoundpad';
 import { SoundPadButton } from './SoundPadButton';
 import { SoundPadEditor } from './SoundPadEditor';
@@ -42,6 +44,9 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
   const [editing, setEditing] = useState<{ open: boolean; pad: SoundPad | null }>({ open: false, pad: null });
   const [showCategories, setShowCategories] = useState(false);
   const [arranging, setArranging] = useState(false);
+  const [midiOn, setMidiOn] = useState(midiService.enabled);
+  const [midiDevices, setMidiDevices] = useState<string[]>([]);
+  const [midiError, setMidiError] = useState<string | null>(null);
   const [clock, setClock] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [packBusy, setPackBusy] = useState<'export' | 'import' | null>(null);
@@ -108,6 +113,49 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
       return pad.categoryId === filter;
     });
   }, [sp.pads, filter, search]);
+
+  // Lo que se dispara por atajo o por MIDI se lee de una referencia y no de una
+  // dependencia del efecto: si no, cada cambio en la lista de pads —o cada
+  // cuadro del progreso— desmontaría y volvería a montar el listener global.
+  const liveRef = useRef({ pads: visiblePads, play: sp.playPad, panic: sp.stopAll, arranging });
+  liveRef.current = { pads: visiblePads, play: sp.playPad, panic: sp.stopAll, arranging };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const { pads, play, panic, arranging: organizando } = liveRef.current;
+      if (organizando) return;
+      // Con un modal abierto, Escape le pertenece al modal.
+      const modalOpen = Boolean(document.querySelector('[data-overlay]'));
+      const action = resolveShortcut(e, { modalOpen });
+      if (!action) return;
+      e.preventDefault();
+      if (action.kind === 'panic') { panic(); return; }
+      const pad = pads[action.index];
+      if (pad) play(pad);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // MIDI: cada pad con `midiNote` asignada responde a esa nota, venga de donde
+  // venga. No se filtra por canal a propósito: un pedal barato manda por el que
+  // se le antoja y hacer que el usuario lo averigüe no aporta nada.
+  useEffect(() => {
+    if (!midiOn) return;
+    return midiService.subscribe(({ note }) => {
+      if (liveRef.current.arranging) return;
+      const pad = liveRef.current.pads.find(p => p.midiNote === note);
+      if (pad) liveRef.current.play(pad);
+    });
+  }, [midiOn]);
+
+  const enableMidi = async () => {
+    setMidiError(null);
+    const ok = await midiService.enable();
+    if (!ok) { setMidiError(t.soundpadMidiDenied); return; }
+    setMidiOn(true);
+    setMidiDevices(midiService.deviceNames());
+  };
 
   /**
    * Progreso de un pad, de 0 a 1. `null` si está en bucle indefinido (no hay
@@ -346,6 +394,7 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
               onStop={(p) => sp.stopPad(p.id)}
               onRetract={sp.retract}
               dense={isShort}
+              shortcut={shortcutKeyFor(visiblePads.indexOf(pad))}
               onEdit={(p) => setEditing({ open: true, pad: p })}
               onToggleFavorite={sp.toggleFavorite}
               labels={{
@@ -406,6 +455,36 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
             {packBusy === 'import' ? t.soundpadImporting : t.soundpadImport}
           </button>
           {packNote && <span className="text-[10px] text-zinc-500">{packNote}</span>}
+        </div>
+
+        {/* Atajos y MIDI: disparar sin tocar la pantalla. El acceso a MIDI se pide
+            sólo cuando el usuario lo enciende — pedirlo al abrir el tablero sería
+            una ventana de permiso que la mayoría no necesita. */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] text-zinc-500 flex items-center gap-1.5">
+            <Keyboard size={11} />
+            {t.soundpadShortcutsHint}
+          </span>
+          {isMidiSupported() ? (
+            midiOn ? (
+              <span className="text-[10px] text-zinc-500 flex items-center gap-1.5">
+                <Radio size={11} className="text-emerald-500" />
+                {t.soundpadMidi}: {midiDevices.length > 0 ? midiDevices.join(', ') : t.soundpadMidiNoDevices}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={enableMidi}
+                className="min-h-9 px-3 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold flex items-center gap-1.5"
+              >
+                <Radio size={12} />
+                {t.soundpadMidiEnable}
+              </button>
+            )
+          ) : (
+            <span className="text-[10px] text-zinc-400">{t.soundpadMidiUnsupported}</span>
+          )}
+          {midiError && <span className="text-[10px] text-amber-600">{midiError}</span>}
         </div>
 
         {sp.usage && sp.usage.usedBytes > 0 && (
