@@ -1,7 +1,7 @@
 /**
  * Prueba de humo de la interfaz.
  *
- * Existe porque `npm test` sólo cubre el motor de armonía y `tsc` no ve errores
+ * Existe porque `npm test` sólo cubre lógica pura y `tsc` no ve errores
  * de runtime: una vez se desplegó a producción una pantalla en blanco (hooks
  * declarados debajo de un return temprano) que pasó lint, tests y dos revisiones
  * de código. Esto la habría detectado.

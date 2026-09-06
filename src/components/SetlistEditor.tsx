@@ -4,6 +4,7 @@ import { X, GripVertical, Plus, Search, ChevronUp, ChevronDown } from 'lucide-re
 import { motion, Reorder, AnimatePresence, useDragControls } from 'motion/react';
 import { translations } from '../translations';
 import { useAuth } from './AuthProvider';
+import { autoScroll } from '../lib/autoScroll';
 
 interface SetlistEditorProps {
   initialSetlist?: Partial<Setlist>;
@@ -12,22 +13,6 @@ interface SetlistEditorProps {
   onCancel: () => void;
 }
 
-/** Desplaza el contenedor con scroll cuando se arrastra cerca de sus bordes. */
-function autoScroll(el: HTMLElement | null, clientY: number) {
-  let node: HTMLElement | null = el;
-  while (node && node !== document.body) {
-    const canScroll = node.scrollHeight > node.clientHeight &&
-      /auto|scroll/.test(getComputedStyle(node).overflowY);
-    if (canScroll) {
-      const r = node.getBoundingClientRect();
-      const ZONE = 80;
-      if (clientY < r.top + ZONE) node.scrollTop -= Math.max(4, (r.top + ZONE - clientY) / 4);
-      else if (clientY > r.bottom - ZONE) node.scrollTop += Math.max(4, (clientY - (r.bottom - ZONE)) / 4);
-      return;
-    }
-    node = node.parentElement;
-  }
-}
 
 const SetlistItem: React.FC<{
   id: string;

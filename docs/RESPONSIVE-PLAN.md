@@ -92,7 +92,6 @@ El barrido completo de alturas de viewport:
 | Archivo:línea | Estado | Acción |
 | --- | --- | --- |
 | `src/App.tsx:35` | `max-h-[90vh]` | → `90dvh` |
-| `src/components/HarmonyComposer.tsx:954` | `max-h-[90vh]` | → `90dvh` |
 | `src/components/SetlistEditor.tsx:164` | `max-h-[80vh]` | → `80dvh` |
 | `src/components/DirectorModeDialog.tsx:159` | **sin tope + `overflow-hidden`** | `max-h-[90dvh]` + `overflow-y-auto` |
 | `src/components/SetlistViewer.tsx:629` | **sin tope + `overflow-hidden`** | ídem |
@@ -389,11 +388,10 @@ aprovecha los 844px de ancho en vez de pelear por el alto.
    y añadir botones ↑/↓ como alternativa al drag.
 4. **`UtilitariosHub`** — `inline-flex` sin `flex-wrap` ni `overflow-x` con tres
    etiquetas largas ≈ 500px: **la tercera pestaña es inalcanzable** a 390px. No es
-   padding, es un bug funcional.
+   padding, es un bug funcional. (Mitigado al quedar sólo dos pestañas.)
 5. **`GuitarTuner`** — ~496px mínimos contra 280-310px útiles. Dos columnas en
    horizontal.
-6. **`HarmonyComposer`** — fichas de acorde fijas en 64×58px.
-7. **`SetlistViewer`** — que el bloque flotante no tape el contenido con poco alto.
+6. **`SetlistViewer`** — que el bloque flotante no tape el contenido con poco alto.
 
 ### 5.4 Accesibilidad
 
@@ -412,8 +410,6 @@ aprovecha los 844px de ancho en vez de pelear por el alto.
 ## Qué queda fuera
 
 - Rediseñar el Modo Director: funciona y es lo mejor adaptado a tablet.
-- `HarmonyManual`: es el componente mejor adaptado del proyecto (24 `sm:`,
-  14 `xl:`) y sirve de referencia.
 - Los 297 tamaños fijos completos: se atacan las superficies de navegación.
 
 ## Orden y dependencias

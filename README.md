@@ -8,7 +8,8 @@
 [![App en vivo](https://img.shields.io/badge/app-franco--control.web.app-2563eb)](https://franco-control.web.app)
 
 Gestor colaborativo de canciones, acordes y setlists para músicos, con
-sincronización en tiempo real (Modo Director). PWA construida con React + Vite +
+sincronización en tiempo real (Modo Director) y un **Soundpad** para disparar
+sonidos en vivo durante sesiones y ceremonias. PWA construida con React + Vite +
 Firebase.
 
 > **Plataforma propia (v2):** la app ya no depende de Google AI Studio. Se
@@ -40,4 +41,5 @@ URL pública: https://franco-control.web.app
 - **[DEPLOY.md](DEPLOY.md)** — infraestructura, publicación, caché y base de datos.
 - **[AUTH.md](AUTH.md)** — cómo funciona el acceso con Google y cómo depurarlo.
 - **[AGENTS.md](AGENTS.md)** — arquitectura, reglas de negocio y workflows.
+- **[docs/SOUNDPAD.md](docs/SOUNDPAD.md)** — el Soundpad: modelo de datos, gotchas y cómo publicarlo.
 - **[TODO.md](TODO.md)** — backlog de mejoras.
