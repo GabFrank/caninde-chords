@@ -1,3 +1,37 @@
+# [3.0.0](https://github.com/GabFrank/caninde-chords/compare/v2.17.0...v3.0.0) (2026-09-06)
+
+
+* feat(utilitarios)!: retirar el Yggdrasil Armónico y el Manual de Conexiones ([a00ef2f](https://github.com/GabFrank/caninde-chords/commit/a00ef2f9bbde80f47e1e124e34506f655a04b397))
+
+
+### Bug Fixes
+
+* **soundpad:** disparos al desplazar, salto de la grilla y uso en teléfono ([085e776](https://github.com/GabFrank/caninde-chords/commit/085e776097b58a6520b5a7a1543df6022a0f13e3))
+* **soundpad:** el pánico alargaba el sonido, e importar un pack no creaba nada ([5304200](https://github.com/GabFrank/caninde-chords/commit/5304200b68b3b6981ffd0b13b7743e6b7c628ad7))
+* **soundpad:** el pedal MIDI dispara su pad esté o no en el filtro actual ([02294e3](https://github.com/GabFrank/caninde-chords/commit/02294e31f9ed9322b9fc9cc9e343a26dc88933f9))
+* **soundpad:** los hallazgos menores de las auditorías ([af12c16](https://github.com/GabFrank/caninde-chords/commit/af12c16b4e76a1d7d678f537d5af258d3a744a77))
+* **soundpad:** pérdida de audio, bucle sin frenos y errores de Firestore mudos ([e85bca2](https://github.com/GabFrank/caninde-chords/commit/e85bca25cf23811ba86629d519580c3fc2200abd))
+
+
+### Features
+
+* **soundpad:** disparar con el teclado y con un controlador MIDI ([1df3fe5](https://github.com/GabFrank/caninde-chords/commit/1df3fe5fcd09bf11806feb88379ceaac5d5310c4))
+* **soundpad:** modo organizar para acomodar el orden de los pads ([8aa8407](https://github.com/GabFrank/caninde-chords/commit/8aa8407d74f150c585f67071288c3e9ba6938e02))
+* **soundpad:** motor de audio, biblioteca en el dispositivo y modelo de datos ([37805e5](https://github.com/GabFrank/caninde-chords/commit/37805e5cc67c266760a10b1605e97dfef51d4068))
+* **soundpad:** pack .zip para llevar la biblioteca a otro dispositivo ([49bbdc9](https://github.com/GabFrank/caninde-chords/commit/49bbdc90170dacd5874c150a0fe78a6f73da1b87))
+* **soundpad:** pads de sonido para sesiones y ceremonias ([#3](https://github.com/GabFrank/caninde-chords/issues/3)) ([ae192ed](https://github.com/GabFrank/caninde-chords/commit/ae192edb3ff3a0c2a5b26125bc1d309c7ce027c7))
+* **soundpad:** recorte no destructivo y fundido en segundos ([7afb563](https://github.com/GabFrank/caninde-chords/commit/7afb56347a2e3746dc1d79d59f22162fc413d36b))
+* **soundpad:** tablero de pads con categorías, favoritos y prueba funcional ([ed58056](https://github.com/GabFrank/caninde-chords/commit/ed58056931671bcb0101aa76bba25695eca0641c))
+
+
+### BREAKING CHANGES
+
+* se eliminan el Yggdrasil Armónico (Taller) y el Manual de
+Conexiones, junto con la colección `compositions`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Tk3rNnzQqqxWj7NG4HuiQC
+
 # [2.17.0](https://github.com/GabFrank/caninde-chords/compare/v2.16.0...v2.17.0) (2026-09-02)
 
 
