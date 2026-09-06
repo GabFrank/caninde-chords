@@ -96,6 +96,23 @@ await page.waitForTimeout(600);
 const fichasDeVoz = () => page.evaluate(() => document.querySelectorAll('[data-voice-id]').length);
 const countPlaying = () => page.evaluate(() =>
   document.querySelectorAll('[data-pad-id][data-playing="true"]').length);
+// Por id y no por texto: el pad muestra nombre, insignias y duración juntos.
+const idsDePads = () => page.evaluate(() =>
+  [...document.querySelectorAll('[data-pad-id]')].map(el => el.getAttribute('data-pad-id')));
+
+/**
+ * Espera a que no quede nada sonando. Con esperas fijas no alcanza: el fundido
+ * es configurable por sonido y un ambiente con 2 s de apagado sigue sonando —
+ * correctamente— mucho después de tocar el pánico.
+ */
+async function esperarSilencio(ms = 6000) {
+  const hasta = Date.now() + ms;
+  while (Date.now() < hasta) {
+    if (await countPlaying() === 0) return true;
+    await page.waitForTimeout(150);
+  }
+  return false;
+}
 
 const results = [];
 const check = (name, ok, extra = '') => { results.push(`${ok ? '✓' : '✗'} ${name}${extra ? ' — ' + extra : ''}`); if (!ok) process.exitCode = 1; };
@@ -230,6 +247,41 @@ check('las repeticiones se guardaron', await page.locator('input[type=number]').
 await page.getByRole('button', { name: /^Cerrar$/ }).click();
 await page.waitForTimeout(300);
 
+// ── Recorte no destructivo y fundido ────────────────────────────────────────
+await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
+  .getByRole('button', { name: /Editar|Edit/ }).click();
+await page.waitForTimeout(700);
+check('el recortador dibuja la forma de onda',
+  await page.getByRole('img', { name: /Forma de onda|Waveform/ }).count() === 1);
+
+// El WAV de prueba dura 1 s: se recorta a la mitad del medio.
+await page.locator('#trim-start').fill('0.25');
+await page.locator('#trim-end').fill('0.75');
+await page.locator('#pad-fade').fill('2');
+await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
+await page.waitForTimeout(1000);
+
+await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
+  .getByRole('button', { name: /Editar|Edit/ }).click();
+await page.waitForTimeout(700);
+check('el recorte se guardó', await page.locator('#trim-start').inputValue() === '0.25'
+  && await page.locator('#trim-end').inputValue() === '0.75',
+  `${await page.locator('#trim-start').inputValue()}-${await page.locator('#trim-end').inputValue()}`);
+check('el fundido se guardó en segundos', await page.locator('#pad-fade').inputValue() === '2');
+
+// Reemplazar el archivo tiene que borrar las marcas: apuntaban al audio viejo.
+await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
+await page.waitForTimeout(300);
+await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
+await page.waitForTimeout(1200);
+await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
+  .getByRole('button', { name: /Editar|Edit/ }).click();
+await page.waitForTimeout(900);
+const inicio = await page.locator('#trim-start').inputValue();
+check('reemplazar el archivo borra el recorte viejo', inicio === '0', `empieza en ${inicio}`);
+await page.getByRole('button', { name: /^Cerrar$/ }).click();
+await page.waitForTimeout(400);
+
 // ── Categorías: son uno de los requisitos y no tenían ninguna cobertura ──────
 await page.getByRole('button', { name: /^(Categorías|Categories)$/ }).click();
 await page.waitForTimeout(400);
@@ -285,7 +337,6 @@ const clavesGuardadas = () => page.evaluate(() => new Promise(res => {
 }));
 
 // Simula el dispositivo nuevo: las fichas llegaron por Firestore, los audios no.
-const audiosAntes = await clavesGuardadas();
 await borrarAudios();
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForSelector('[data-mode]', { timeout: 20000 });
@@ -296,9 +347,14 @@ check('sin los audios, los pads avisan que falta el archivo',
 
 await page.locator('input[type=file][accept*="zip"]').setInputFiles(packPath);
 await page.waitForTimeout(2500);
+// Se compara contra los PADS, no contra las claves guardadas: reemplazar el
+// archivo de un pad deja su audio viejo en el dispositivo hasta la próxima
+// sesión (está protegido de `pruneOrphans`), y el pack sólo lleva los que algún
+// pad referencia — que es exactamente lo que debe llevar.
 const restaurados = await clavesGuardadas();
-check('importar el pack devuelve todos los audios al dispositivo', restaurados === audiosAntes,
-  `restaurados ${restaurados} de ${audiosAntes}`);
+const padsConAudio = (await idsDePads()).length;
+check('importar el pack devuelve el audio de todos los pads', restaurados >= padsConAudio,
+  `restaurados ${restaurados}, pads ${padsConAudio}`);
 check('el aviso de audio faltante desaparece',
   await page.getByText(/La ficha del sonido se sincronizó|The sound card is synced/).count() === 0);
 
@@ -309,10 +365,6 @@ await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
 rmSync(packPath, { force: true });
 
 // ── Modo organizar ──────────────────────────────────────────────────────────
-// Por id y no por texto: el pad muestra nombre, insignias y duración juntos.
-const idsDePads = () => page.evaluate(() =>
-  [...document.querySelectorAll('[data-pad-id]')].map(el => el.getAttribute('data-pad-id')));
-
 const antesDeOrdenar = await idsDePads();
 await page.getByRole('button', { name: /^(Organizar|Arrange)$/ }).click();
 await page.waitForTimeout(500);
@@ -367,7 +419,7 @@ const yDurante = (await page.locator('[data-pad-id]').first().boundingBox()).y;
 check('la grilla no se mueve al empezar a sonar', Math.abs(yDurante - yAntes) < 2,
   `se movió ${Math.round(yDurante - yAntes)}px`);
 await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
-await page.waitForTimeout(400);
+await esperarSilencio();
 
 // (c) Los pads tienen que responder al teclado (pedal, teclado numérico, lector).
 await page.locator('[data-pad-id]').first().focus();
@@ -375,7 +427,7 @@ await page.keyboard.press('Enter');
 await page.waitForTimeout(500);
 check('un pad enfocado se dispara con Enter', await countPlaying() === 1, `activos: ${await countPlaying()}`);
 await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
-await page.waitForTimeout(400);
+await esperarSilencio();
 
 // (c2) Atajos globales: las teclas 1-9 disparan por posición, Escape es el pánico.
 await page.locator('body').click({ position: { x: 5, y: 5 } });
@@ -388,8 +440,7 @@ check('la tecla 2 dispara el segundo pad de la pantalla',
   sonando.length === 1 && sonando[0] === segundoId, `sonando: ${sonando.join(',')}`);
 
 await page.keyboard.press('Escape');
-await page.waitForTimeout(500);
-check('Escape para todo', await countPlaying() === 0);
+check('Escape para todo', await esperarSilencio());
 
 // Escribiendo en un campo, los números no pueden disparar nada.
 await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();

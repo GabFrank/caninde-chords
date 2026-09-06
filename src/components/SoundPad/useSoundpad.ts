@@ -223,6 +223,10 @@ export function useSoundpad() {
         patch.fileKey = newKey;
         patch.fileName = file.name.slice(0, 199);
         patch.fileSize = file.size;
+        // Las marcas del recorte apuntaban al archivo VIEJO: conservarlas
+        // recortaría el nuevo por donde no corresponde, o lo dejaría mudo.
+        patch.trimStartMs = deleteField();
+        patch.trimEndMs = deleteField();
         // Si la duración del archivo nuevo no se puede leer, se BORRA el campo:
         // dejarlo mostraría la duración del archivo anterior.
         patch.durationMs = durationMs ?? deleteField();

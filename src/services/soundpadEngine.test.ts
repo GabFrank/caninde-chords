@@ -32,11 +32,18 @@ class FakeGain {
 class FakeSource {
   buffer: { duration: number } | null = null;
   loop = false;
+  loopStart = 0;
+  loopEnd = 0;
   onended: (() => void) | null = null;
   started: number | null = null;
+  /** Argumentos de start(): [cuándo, desde dónde del archivo, cuánto]. */
+  startArgs: (number | undefined)[] = [];
   stopped: number | null = null;
   connect() {}
-  start(t: number) { this.started = t; }
+  start(t: number, offset?: number, duration?: number) {
+    this.started = t;
+    this.startArgs = [t, offset, duration];
+  }
   stop(t: number) { this.stopped = t; }
   /** Simula el final de la reproducción, que en el navegador dispara onended. */
   finish() { this.onended?.(); }
@@ -122,7 +129,7 @@ describe('resolveFadeSec', () => {
 
   it('respeta el del pad y lo acota', () => {
     expect(resolveFadeSec({ fadeOutMs: 300 })).toBeCloseTo(0.3);
-    expect(resolveFadeSec({ fadeOutMs: 99999 })).toBeCloseTo(5);
+    expect(resolveFadeSec({ fadeOutMs: 99999 })).toBeCloseTo(15);  // el techo
     expect(resolveFadeSec({ fadeOutMs: -10 })).toBe(0);
   });
 });
@@ -266,6 +273,43 @@ describe('SoundpadEngine', () => {
     engine.retract(voiceId!);
 
     expect(ctx.sources[0].stopped).toBeCloseTo(0.015);
+  });
+
+  // ── Recorte no destructivo ──────────────────────────────────────────────
+  // El buffer del doble dura 2 s.
+
+  it('sin recorte suena el archivo entero desde el principio', async () => {
+    await engine.play(makePad({ repeat: 1 }));
+    expect(ctx.sources[0].startArgs).toEqual([0, 0, 2]);
+  });
+
+  it('con recorte arranca en la marca y dura sólo la ventana', async () => {
+    await engine.play(makePad({ repeat: 1, trimStartMs: 500, trimEndMs: 1500 }));
+    expect(ctx.sources[0].startArgs).toEqual([0, 0.5, 1]);
+    expect(ctx.sources[0].stopped).toBeCloseTo(1);
+  });
+
+  it('en bucle, el recorte va en loopStart/loopEnd y no en start()', async () => {
+    // El tercer argumento de start() limita el TOTAL reproducido: pasarlo con
+    // loop activo cortaría el bucle al final de la primera pasada.
+    await engine.play(makePad({ repeat: 0, trimStartMs: 400, trimEndMs: 1400 }));
+    const src = ctx.sources[0];
+    expect(src.loop).toBe(true);
+    expect(src.loopStart).toBeCloseTo(0.4);
+    expect(src.loopEnd).toBeCloseTo(1.4);
+    expect(src.startArgs).toEqual([0, 0.4, undefined]);
+    expect(src.stopped).toBeNull();
+  });
+
+  it('las repeticiones cuentan la ventana recortada, no el archivo', async () => {
+    // Tres pasadas de un recorte de 1 s son 3 s, no 6.
+    await engine.play(makePad({ repeat: 3, trimStartMs: 500, trimEndMs: 1500 }));
+    expect(ctx.sources[0].stopped).toBeCloseTo(3);
+  });
+
+  it('un recorte incoherente hace sonar el archivo entero, no silencio', async () => {
+    await engine.play(makePad({ repeat: 1, trimStartMs: 1800, trimEndMs: 200 }));
+    expect(ctx.sources[0].startArgs).toEqual([0, 0, 2]);
   });
 
   it('un audio que no está en este dispositivo se distingue de un fallo real', async () => {

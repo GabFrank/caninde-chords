@@ -6,7 +6,7 @@
 // cuánto le queda sin tener que contar.
 
 import React, { useRef } from 'react';
-import { Star, Layers, Scissors, Repeat, Infinity as InfinityIcon, AlertTriangle, Settings2, Square } from 'lucide-react';
+import { Star, Layers, Scissors, Repeat, Infinity as InfinityIcon, AlertTriangle, Settings2, Square, Crop } from 'lucide-react';
 import { SoundPad } from '../../types';
 import { padColor, padIcon } from '../../lib/soundpadStyles';
 import { formatDuration } from '../../services/soundLibrary';
@@ -158,6 +158,7 @@ export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
                   expone, así que estas etiquetas eran inertes. Lo que cuentan
                   estos íconos va en el nombre accesible del botón. */}
               {pad.overlay ? <Layers size={10} /> : <Scissors size={10} />}
+              {(pad.trimStartMs !== undefined || pad.trimEndMs !== undefined) && <Crop size={10} />}
               {loop
                 ? <InfinityIcon size={10} />
                 : pad.repeat > 1 && (

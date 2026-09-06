@@ -58,6 +58,8 @@ service cloud.firestore {
     //   - repeat: number (required, 0..50; 0 = bucle)
     //   - overlay: bool (required)
     //   - midiNote: number (optional, 0..127) — nota que dispara el pad
+    //   - trimStartMs / trimEndMs: number (optional) — recorte NO destructivo:
+    //     marcas sobre el archivo, que no se modifica
     //   - favorite: bool (required)
     //   - ownerId: string (required, immutable)
     //
@@ -189,7 +191,7 @@ service cloud.firestore {
       // `hasOnly` importa especialmente acá: la arquitectura del Soundpad manda
       // el audio a IndexedDB y no a Firestore. Sin este cerrojo, un cliente
       // modificado podría meter un MP3 en base64 dentro del documento.
-      return hasOnlyAllowedFields(data, ['name', 'categoryId', 'color', 'icon', 'fileKey', 'fileName', 'fileSize', 'durationMs', 'volume', 'repeat', 'overlay', 'fadeOutMs', 'midiNote', 'favorite', 'order', 'ownerId', 'createdAt', 'updatedAt']) &&
+      return hasOnlyAllowedFields(data, ['name', 'categoryId', 'color', 'icon', 'fileKey', 'fileName', 'fileSize', 'durationMs', 'volume', 'repeat', 'overlay', 'fadeOutMs', 'midiNote', 'trimStartMs', 'trimEndMs', 'favorite', 'order', 'ownerId', 'createdAt', 'updatedAt']) &&
              hasRequiredFields(data, ['name', 'categoryId', 'fileKey', 'volume', 'repeat', 'overlay', 'favorite', 'ownerId', 'createdAt', 'updatedAt']) &&
              data.createdAt is timestamp && data.updatedAt is timestamp &&
              data.name is string && data.name.size() > 0 && data.name.size() < 60 &&
@@ -203,7 +205,9 @@ service cloud.firestore {
              (!('fileName' in data) || (data.fileName is string && data.fileName.size() < 200)) &&
              (!('fileSize' in data) || data.fileSize is number) &&
              (!('durationMs' in data) || data.durationMs is number) &&
-             (!('fadeOutMs' in data) || (data.fadeOutMs is number && data.fadeOutMs >= 0 && data.fadeOutMs <= 5000)) &&
+             (!('fadeOutMs' in data) || (data.fadeOutMs is number && data.fadeOutMs >= 0 && data.fadeOutMs <= 15000)) &&
+             (!('trimStartMs' in data) || (data.trimStartMs is number && data.trimStartMs >= 0)) &&
+             (!('trimEndMs' in data) || (data.trimEndMs is number && data.trimEndMs >= 0)) &&
              (!('midiNote' in data) || (data.midiNote is number && data.midiNote >= 0 && data.midiNote <= 127)) &&
              (!('color' in data) || (data.color is string && data.color.size() < 24)) &&
              (!('icon' in data) || (data.icon is string && data.icon.size() < 24)) &&

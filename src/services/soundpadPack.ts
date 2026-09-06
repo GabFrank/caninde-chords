@@ -31,6 +31,9 @@ interface PackPad {
   repeat: number;
   overlay: boolean;
   fadeOutMs?: number;
+  trimStartMs?: number;
+  trimEndMs?: number;
+  midiNote?: number;
   favorite: boolean;
   order: number;
 }
@@ -91,6 +94,9 @@ export async function exportPack(pads: SoundPad[], categories: SoundCategory[]):
       repeat: pad.repeat,
       overlay: pad.overlay,
       fadeOutMs: pad.fadeOutMs,
+      trimStartMs: pad.trimStartMs,
+      trimEndMs: pad.trimEndMs,
+      midiNote: pad.midiNote,
       favorite: pad.favorite,
       order: pad.order ?? 0,
     });
@@ -119,6 +125,10 @@ function isSafeId(id: unknown): id is string {
 const num = (v: unknown, fallback: number, min: number, max: number) =>
   (typeof v === 'number' && Number.isFinite(v)) ? Math.max(min, Math.min(max, v)) : fallback;
 
+/** Como `num`, pero un campo ausente sigue ausente en vez de inventarse. */
+const optNum = (v: unknown, min: number, max: number) =>
+  (typeof v === 'number' && Number.isFinite(v)) ? Math.max(min, Math.min(max, v)) : undefined;
+
 /**
  * Normaliza una ficha del manifiesto. El .zip lo trae el usuario, así que sus
  * campos son entrada no confiable: escribirlos tal cual en Firestore hace que
@@ -146,7 +156,12 @@ function sanitizePackPad(raw: unknown): PackPad | null {
     // y el pad no sonaría nunca.
     repeat: Math.round(num(p.repeat, 1, 0, 50)),
     overlay: typeof p.overlay === 'boolean' ? p.overlay : true,
-    fadeOutMs: num(p.fadeOutMs, 120, 0, 5000),
+    fadeOutMs: num(p.fadeOutMs, 120, 0, 15000),
+    // El recorte queda `undefined` si no venía: `num` con un valor por defecto
+    // inventaría marcas que el pack no traía.
+    trimStartMs: optNum(p.trimStartMs, 0, 24 * 3600_000),
+    trimEndMs: optNum(p.trimEndMs, 0, 24 * 3600_000),
+    midiNote: optNum(p.midiNote, 0, 127),
     favorite: p.favorite === true,
     order: num(p.order, 0, 0, Number.MAX_SAFE_INTEGER),
   };

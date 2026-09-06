@@ -6,7 +6,8 @@ Afinador.
 
 Por cada sonido se configura: **volumen**, **cantidad de repeticiones** (o bucle
 indefinido), si es **overlay** (se superpone a lo que suene) o **exclusivo**
-(corta todo antes de sonar), y el **fundido** con que se apaga. Se organizan por
+(corta todo antes de sonar), el **fundido** con que se apaga (0 a 15 s) y un
+**recorte no destructivo** de qué parte del archivo suena. Se organizan por
 **categorías** y por **favoritos**.
 
 ---
@@ -51,6 +52,9 @@ arregla revinculando el archivo o importando el pack `.zip`.
 | `src/components/SoundPad/PadArranger.tsx` | Modo organizar: reordenar los pads |
 | `src/lib/padOrder.ts` | Reparto de los valores de `order` al reordenar |
 | `src/lib/padShortcuts.ts` | Atajos de teclado |
+| `src/lib/padTrim.ts` | Resolución del recorte contra la duración real |
+| `src/lib/waveform.ts` | Picos de la forma de onda |
+| `src/components/SoundPad/TrimEditor.tsx` | El recortador visual |
 | `src/services/midi.ts` | Web MIDI: permiso, controladores y notas |
 
 Las interfaces `SoundPad` y `SoundCategory` están en `src/types.ts`; las reglas
@@ -186,7 +190,34 @@ El permiso de Web MIDI se pide sólo cuando el usuario enciende MIDI, nunca al
 abrir el tablero. Safari no implementa la API: ahí la sección se reemplaza por un
 aviso y el resto funciona igual.
 
-### 12. iOS suspende el audio con la pantalla bloqueada
+### 12. El recorte no toca el archivo
+
+`trimStartMs` y `trimEndMs` son dos marcas en la ficha; el archivo queda intacto.
+El motor arranca la fuente en la primera y la corta en la segunda, así que el
+recorte se puede mover o quitar cuantas veces haga falta — y el pack sigue
+llevando el audio completo.
+
+Dos cosas que hay que respetar:
+
+- **En bucle, el recorte va en `loopStart`/`loopEnd`**, no en el tercer argumento
+  de `start()`. Ese argumento limita el TOTAL reproducido, así que con el bucle
+  activo cortaría el sonido al final de la primera pasada.
+- **Ante marcas incoherentes, suena el archivo entero** (`resolveTrim`), nunca
+  silencio: un pad mudo en plena ceremonia es mucho peor que uno que suena de
+  más. Y las repeticiones cuentan la ventana recortada, no el archivo.
+
+Al **reemplazar el archivo de un pad** las marcas se borran: apuntaban al audio
+viejo, y conservarlas recortaría el nuevo por donde no corresponde.
+
+### 13. El fundido se piensa en segundos
+
+Va de 0 a 15 s y en la interfaz es un deslizador en segundos, no un número en
+milisegundos: en ms nadie sabe si 2500 es mucho o poco para apagar un ambiente.
+Se aplica cuando otro pad exclusivo lo corta, cuando el operador lo para desde su
+propio pad o desde la franja "Sonando", y con el pánico. Sólo el retiro de un
+disparo accidental lo ignora (ver gotcha 5).
+
+### 14. iOS suspende el audio con la pantalla bloqueada
 
 En PWA instalada, iOS suspende el `AudioContext` al bloquear la pantalla o pasar
 a segundo plano. Mitigación: Screen Wake Lock mientras el tablero está abierto, y

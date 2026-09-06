@@ -6,7 +6,8 @@ import { Modal } from '../Modal';
 import { SoundCategory, SoundPad } from '../../types';
 import { Strings } from '../../translations';
 import { ACCEPTED_AUDIO, formatBytes, formatDuration } from '../../services/soundLibrary';
-import { MAX_REPEAT } from '../../services/soundpadEngine';
+import { MAX_REPEAT, MAX_FADE_MS, soundpadEngine } from '../../services/soundpadEngine';
+import { TrimEditor } from './TrimEditor';
 import { midiService, midiNoteName } from '../../services/midi';
 import {
   DEFAULT_COLOR_ID, DEFAULT_ICON_ID, SOUNDPAD_COLORS, SOUNDPAD_ICONS, UNCATEGORIZED_ID, padIcon,
@@ -42,6 +43,8 @@ const emptyDraft = {
   fadeOutMs: 120,
   favorite: false,
   midiNote: undefined as number | undefined,
+  trimStartMs: undefined as number | undefined,
+  trimEndMs: undefined as number | undefined,
 };
 
 export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
@@ -54,6 +57,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [learning, setLearning] = useState(false);
+  const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -72,6 +76,8 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
       fadeOutMs: pad.fadeOutMs ?? 120,
       favorite: pad.favorite,
       midiNote: pad.midiNote,
+      trimStartMs: pad.trimStartMs,
+      trimEndMs: pad.trimEndMs,
     } : { ...emptyDraft });
     setLearning(false);
   }, [open, pad]);
@@ -87,6 +93,17 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
     });
     return off;
   }, [learning]);
+
+  // El audio decodificado del pad, para dibujar la onda del recortador. Se pide
+  // sólo al abrir: el motor lo tiene cacheado desde la precarga del tablero.
+  useEffect(() => {
+    if (!open || !pad || missing) { setBuffer(null); return; }
+    let cancelado = false;
+    soundpadEngine.ensureBuffer(pad.fileKey)
+      .then(b => { if (!cancelado) setBuffer(b); })
+      .catch(() => { if (!cancelado) setBuffer(null); });
+    return () => { cancelado = true; };
+  }, [open, pad, missing]);
 
   const pickFile = (f: File | null) => {
     if (!f) return;
@@ -275,16 +292,42 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
           </div>
         </div>
 
+        {/* El fundido se expresa en SEGUNDOS: es como se piensa un apagado de
+            ambiente, y en milisegundos nadie sabe si 2500 es mucho o poco. */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400" htmlFor="pad-fade">{t.soundpadFade}</label>
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400 flex justify-between" htmlFor="pad-fade">
+            <span>{t.soundpadFade}</span>
+            <span className="font-mono tabular-nums">
+              {(draft.fadeOutMs / 1000).toFixed(2)} {t.soundpadSeconds}
+            </span>
+          </label>
           <input
             id="pad-fade"
-            type="number" min={0} max={5000} step={10}
-            value={draft.fadeOutMs}
-            onChange={(e) => setDraft(d => ({ ...d, fadeOutMs: Math.max(0, Math.min(5000, Number(e.target.value) || 0)) }))}
-            className="w-28 min-h-11 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-blue-500 outline-none text-sm font-bold"
+            type="range" min={0} max={MAX_FADE_MS / 1000} step={0.05}
+            value={draft.fadeOutMs / 1000}
+            onChange={(e) => setDraft(d => ({ ...d, fadeOutMs: Math.round(Number(e.target.value) * 1000) }))}
+            className="w-full h-11 accent-blue-600 cursor-pointer"
           />
+          <p className="text-[10px] text-zinc-500 leading-relaxed">{t.soundpadFadeHint}</p>
         </div>
+
+        {/* Recorte: sólo con el audio disponible en este dispositivo. */}
+        {pad && !missing && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{t.soundpadTrim}</label>
+            <TrimEditor
+              buffer={buffer}
+              trimStartMs={draft.trimStartMs}
+              trimEndMs={draft.trimEndMs}
+              onChange={(trim) => setDraft(d => ({ ...d, ...trim }))}
+              onPreview={() => previewPad && onPreview(previewPad)}
+              onStopPreview={() => previewPad && onStopPreview(previewPad)}
+              previewing={previewing}
+              t={t}
+            />
+            <p className="text-[10px] text-zinc-500 leading-relaxed">{t.soundpadTrimNote}</p>
+          </div>
+        )}
 
         {/* MIDI: sólo si el usuario ya activó el acceso desde el tablero. */}
         {midiService.enabled && (

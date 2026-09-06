@@ -121,6 +121,10 @@ export interface SoundPad {
   fadeOutMs?: number;
   /** Nota MIDI que dispara este pad (0-127). Se asigna con "aprender". */
   midiNote?: number;
+  /** Recorte NO destructivo: dónde empieza a sonar, en ms desde el inicio. */
+  trimStartMs?: number;
+  /** Recorte NO destructivo: dónde deja de sonar, en ms desde el inicio. */
+  trimEndMs?: number;
   favorite: boolean;
   order: number;
   createdAt: any;

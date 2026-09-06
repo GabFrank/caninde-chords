@@ -11,10 +11,14 @@
 
 import { getAudioContext } from './audioContext';
 import { getSound } from './soundLibrary';
+import { resolveTrim } from '../lib/padTrim';
 import { SoundPad } from '../types';
 
-/** Fundido por defecto, en ms, cuando un pad exclusivo corta a los demás. */
+/** Fundido por defecto, en ms: corto, para que no se oiga el corte. */
 export const DEFAULT_FADE_MS = 120;
+
+/** Techo del fundido configurable, en ms. Coincide con las reglas de Firestore. */
+export const MAX_FADE_MS = 15000;
 
 /** Máximo de repeticiones que aceptamos (coincide con las reglas de Firestore). */
 export const MAX_REPEAT = 50;
@@ -54,7 +58,7 @@ export function clampVolume(v: number): number {
 
 export function resolveFadeSec(pad: Pick<SoundPad, 'fadeOutMs'>): number {
   const ms = Number.isFinite(pad.fadeOutMs as number) ? (pad.fadeOutMs as number) : DEFAULT_FADE_MS;
-  return Math.max(0, Math.min(5000, ms)) / 1000;
+  return Math.max(0, Math.min(MAX_FADE_MS, ms)) / 1000;
 }
 
 /**
@@ -231,7 +235,9 @@ export class SoundpadEngine {
     }
 
     const now = ctx.currentTime;
-    const { loop, stopAfterSec } = computePlayback(buffer.duration, pad.repeat);
+    // El recorte no toca el archivo: se reproduce sólo la ventana marcada.
+    const win = resolveTrim(buffer.duration, pad.trimStartMs, pad.trimEndMs);
+    const { loop, stopAfterSec } = computePlayback(win.durationSec, pad.repeat);
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -242,7 +248,17 @@ export class SoundpadEngine {
 
     source.connect(gain);
     gain.connect(this.master);
-    source.start(now);
+
+    if (loop) {
+      // En bucle, el recorte se expresa con `loopStart`/`loopEnd`; el tercer
+      // argumento de `start()` NO sirve acá, porque limita el total reproducido
+      // y cortaría el bucle en la primera pasada.
+      source.loopStart = win.offsetSec;
+      source.loopEnd = win.offsetSec + win.durationSec;
+      source.start(now, win.offsetSec);
+    } else {
+      source.start(now, win.offsetSec, win.durationSec);
+    }
     if (stopAfterSec !== null) source.stop(now + stopAfterSec);
 
     const voiceId = `v${++this.voiceSeq}`;
