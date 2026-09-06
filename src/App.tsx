@@ -1024,41 +1024,6 @@ export default function App() {
 
   const handleLogout = () => signOut(auth);
 
-  const handleAddSongFromWorkshop = async (songTitle: string, songContent: string) => {
-    if (!user) return;
-    setGlobalLoading('Exportando...');
-    try {
-      const docRef = await addDoc(collection(db, 'songs'), {
-        title: songTitle,
-        artist: 'Composición Caninde',
-        content: songContent,
-        ownerId: user.uid,
-        collaborators: [],
-        editors: [],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-      setActiveTab('songs');
-      setSelectedSong({
-        id: docRef.id,
-        title: songTitle,
-        artist: 'Composición Caninde',
-        content: songContent,
-        ownerId: user.uid,
-        collaborators: [],
-        editors: []
-      } as any);
-      setSelectedSetlist(null);
-      setIsEditing(false);
-      showToast('¡Composición exportada exitosamente!');
-    } catch (e) {
-      console.error('Failed to export composition song to library:', e);
-      showToast('Error al exportar la composición', 'error');
-    } finally {
-      setGlobalLoading(null);
-    }
-  };
-
   const saveSong = async (songData: Partial<Song>) => {
     if (!user) return;
     setGlobalLoading(t.saving || 'Saving...');
@@ -1930,7 +1895,7 @@ export default function App() {
                       <div>
                         <p className="font-extrabold text-sm text-zinc-800 dark:text-zinc-100">{t.utilities}</p>
                         <p className="text-[10px] text-zinc-400 max-w-[150px] leading-relaxed mx-auto mt-1.5">
-                          Herramientas para afinar instrumentos y componer arcos armónicos desde el Yggdrasil.
+                          Sonidos de la ceremonia y afinador de instrumentos.
                         </p>
                       </div>
                     </div>
@@ -1952,7 +1917,6 @@ export default function App() {
                   className="h-full flex flex-col overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-4 md:p-6"
                 >
                   <UtilitariosHub
-                    onExportToSong={handleAddSongFromWorkshop}
                     lang={(profile?.language || 'en') as 'es' | 'en'}
                   />
                 </motion.div>
