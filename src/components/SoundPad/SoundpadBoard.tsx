@@ -127,9 +127,9 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
   // Lo que se dispara por atajo o por MIDI se lee de una referencia y no de una
   // dependencia del efecto: si no, cada cambio en la lista de pads —o cada
   // cuadro del progreso— desmontaría y volvería a montar el listener global.
-  const liveRef = useRef({ pads: visiblePads, play: sp.playPad, panic: sp.stopAll, arranging });
+  const liveRef = useRef({ pads: visiblePads, todos: sp.pads, play: sp.playPad, panic: sp.stopAll, arranging });
   useEffect(() => {
-    liveRef.current = { pads: visiblePads, play: sp.playPad, panic: sp.stopAll, arranging };
+    liveRef.current = { pads: visiblePads, todos: sp.pads, play: sp.playPad, panic: sp.stopAll, arranging };
   });
 
   useEffect(() => {
@@ -159,7 +159,10 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
       // Con un modal abierto tampoco: enseñarle una nota al pad con "Aprender"
       // hacía sonar a todo volumen el pad que ya la tenía asignada.
       if (document.querySelector('[data-overlay]')) return;
-      const pad = liveRef.current.pads.find(p => p.midiNote === note);
+      // Sobre TODOS los pads, no sólo los visibles: la nota es una asignación
+      // absoluta del pad, no una posición en pantalla como las teclas 1-0.
+      // Filtrar por Favoritos dejaba el pedal mudo sin ninguna señal.
+      const pad = liveRef.current.todos.find(p => p.midiNote === note);
       if (pad) liveRef.current.play(pad);
     });
   }, [midiOn]);

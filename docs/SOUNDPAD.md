@@ -180,7 +180,9 @@ disparo mientras la tecla sigue apretada. Y con un modal abierto, `Escape` le
 pertenece al modal: si además hiciera pánico, cerrar el editor callaría el sonido
 que se estaba probando.
 
-**MIDI:** cada pad puede tener una `midiNote` asignada con "Aprender" —la próxima
+**MIDI:** la nota es una asignación **absoluta del pad**, no una posición en
+pantalla como las teclas: un pedal dispara su pad esté o no en el filtro actual.
+Cada pad puede tener una `midiNote` asignada con "Aprender" —la próxima
 nota que llegue del controlador queda tomada—, que es la única forma razonable de
 mapear un pedal sin pedirle al usuario que sepa qué número de nota manda su
 aparato. Un `noteon` con velocidad 0 se trata como `noteoff`: así lo mandan
