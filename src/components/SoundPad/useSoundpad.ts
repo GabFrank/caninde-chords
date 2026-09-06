@@ -20,6 +20,31 @@ import { DEFAULT_COLOR_ID, DEFAULT_ICON_ID, UNCATEGORIZED_ID } from '../../lib/s
 
 export type PadDraft = Omit<SoundPad, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'>;
 
+/**
+ * Deja el fallo de Firestore diagnosticado como manda AGENTS.md y además lo pone
+ * en pantalla.
+ *
+ * `handleFirestoreError` registra el diagnóstico completo (identidad, operación,
+ * ruta) y después LANZA. Llamarlo suelto dentro de un callback del SDK propaga
+ * la excepción a un sitio donde nadie la atrapa y deja el estado a medias: un
+ * `permission-denied` en el listener dejaba el tablero cargando para siempre,
+ * mudo. Acá se atrapa esa excepción para quedarse con el diagnóstico y seguir.
+ */
+function reportFirestore(
+  err: unknown,
+  op: OperationType,
+  path: string,
+  setError: (m: string) => void,
+  cleanup?: () => void,
+) {
+  try {
+    handleFirestoreError(err, op, path);
+  } catch (diagnosed) {
+    setError(diagnosed instanceof Error ? diagnosed.message : String(diagnosed));
+  }
+  cleanup?.();
+}
+
 export interface SoundpadState {
   pads: SoundPad[];
   categories: SoundCategory[];
@@ -45,6 +70,13 @@ export function useSoundpad() {
   const [error, setError] = useState<string | null>(null);
   /** Firmas de catálogo ya precargadas, para no volver a decodificar en cada snapshot. */
   const preloadedFor = useRef('');
+  /**
+   * Claves de audio escritas en esta sesión. Existe para que `pruneOrphans` no
+   * borre un archivo recién guardado: el blob se escribe ANTES de que su ficha
+   * exista en `pads`, y en esa ventana cualquier snapshot que llegue (un pad
+   * creado en otro dispositivo, por ejemplo) lo vería como huérfano.
+   */
+  const ownKeys = useRef<Set<string>>(new Set());
 
   // ── Catálogo ───────────────────────────────────────────────────────────────
 
@@ -57,7 +89,7 @@ export function useSoundpad() {
       next.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
       setPads(next);
       setLoadingPads(false);
-    }, err => handleFirestoreError(err, OperationType.LIST, 'soundPads'));
+    }, err => reportFirestore(err, OperationType.LIST, 'soundPads', setError, () => setLoadingPads(false)));
   }, [user]);
 
   useEffect(() => {
@@ -69,7 +101,7 @@ export function useSoundpad() {
       next.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
       setCategories(next);
       setLoadingCats(false);
-    }, err => handleFirestoreError(err, OperationType.LIST, 'soundCategories'));
+    }, err => reportFirestore(err, OperationType.LIST, 'soundCategories', setError, () => setLoadingCats(false)));
   }, [user]);
 
   // ── Motor ──────────────────────────────────────────────────────────────────
@@ -90,7 +122,7 @@ export function useSoundpad() {
     });
     // Los audios que ya no referencia ningún pad (borrado desde otro
     // dispositivo) ocupan cuota para nada.
-    pruneOrphans(pads.map(p => p.fileKey))
+    pruneOrphans(pads.map(p => p.fileKey), ownKeys.current)
       .then(() => estimateUsage())
       .then(u => { if (!cancelled) setUsage(u); })
       .catch(e => console.warn('No se pudo revisar el almacenamiento', e));
@@ -127,6 +159,7 @@ export function useSoundpad() {
     const fileKey = makeFileKey(file.name);
     try {
       await putSound(fileKey, file);
+      ownKeys.current.add(fileKey);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       throw e;
@@ -150,10 +183,7 @@ export function useSoundpad() {
       ownerId: user.uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }).catch(e => {
-      console.error('No se pudo guardar el pad', e);
-      setError(e instanceof Error ? e.message : String(e));
-    });
+    }).catch(e => reportFirestore(e, OperationType.CREATE, 'soundPads', setError));
   }, [user, nextOrder]);
 
   /**
@@ -172,6 +202,7 @@ export function useSoundpad() {
       try {
         const newKey = makeFileKey(file.name);
         await putSound(newKey, file);
+        ownKeys.current.add(newKey);
         const durationMs = await readDurationMs(file);
         patch.fileKey = newKey;
         patch.fileName = file.name.slice(0, 199);
@@ -189,28 +220,30 @@ export function useSoundpad() {
         return next;
       });
     }
-    updateDoc(doc(db, 'soundPads', pad.id), patch).catch(e => {
-      console.error('No se pudo actualizar el pad', e);
-      setError(e instanceof Error ? e.message : String(e));
-    });
+    updateDoc(doc(db, 'soundPads', pad.id), patch)
+      .catch(e => reportFirestore(e, OperationType.UPDATE, `soundPads/${pad.id}`, setError));
   }, [user]);
 
+  /**
+   * Borra un pad. El audio NO se borra acá: si el servidor rechazara la baja,
+   * Firestore restituye la ficha y el pad quedaría apuntando a un archivo que ya
+   * no existe. Lo limpia `pruneOrphans` cuando el catálogo se asienta sin él —
+   * que es también lo que hace la clave dejar de estar protegida.
+   */
   const deletePad = useCallback(async (pad: SoundPad) => {
     if (!user) return;
     soundpadEngine.stopPad(pad.id, 0.05);
     soundpadEngine.forget(pad.fileKey);
-    deleteDoc(doc(db, 'soundPads', pad.id)).catch(e => {
-      console.error('No se pudo borrar el pad', e);
-      setError(e instanceof Error ? e.message : String(e));
-    });
-    await deleteSound(pad.fileKey).catch(() => {});
+    ownKeys.current.delete(pad.fileKey);
+    deleteDoc(doc(db, 'soundPads', pad.id))
+      .catch(e => reportFirestore(e, OperationType.DELETE, `soundPads/${pad.id}`, setError));
   }, [user]);
 
   const toggleFavorite = useCallback(async (pad: SoundPad) => {
     updateDoc(doc(db, 'soundPads', pad.id), {
       favorite: !pad.favorite,
       updatedAt: serverTimestamp(),
-    }).catch(e => console.error('No se pudo marcar el favorito', e));
+    }).catch(e => reportFirestore(e, OperationType.UPDATE, `soundPads/${pad.id}`, setError));
   }, []);
 
   const createCategory = useCallback(async (name: string, color: string) => {
@@ -221,17 +254,14 @@ export function useSoundpad() {
       order: categories.reduce((m, c) => Math.max(m, c.order ?? 0), 0) + 1,
       ownerId: user.uid,
       createdAt: serverTimestamp(),
-    }).catch(e => {
-      console.error('No se pudo crear la categoría', e);
-      setError(e instanceof Error ? e.message : String(e));
-    });
+    }).catch(e => reportFirestore(e, OperationType.CREATE, 'soundCategories', setError));
   }, [user, categories]);
 
   const updateCategory = useCallback(async (category: SoundCategory, changes: Partial<SoundCategory>) => {
     updateDoc(doc(db, 'soundCategories', category.id), {
       ...changes,
       ...(changes.name ? { name: changes.name.slice(0, 39) } : {}),
-    }).catch(e => console.error('No se pudo renombrar la categoría', e));
+    }).catch(e => reportFirestore(e, OperationType.UPDATE, `soundCategories/${category.id}`, setError));
   }, []);
 
   /** Borra la categoría; sus pads pasan a "sin categoría" en vez de desaparecer. */
@@ -240,17 +270,19 @@ export function useSoundpad() {
     affected.forEach(p => updateDoc(doc(db, 'soundPads', p.id), {
       categoryId: UNCATEGORIZED_ID,
       updatedAt: serverTimestamp(),
-    }).catch(e => console.error('No se pudo reasignar el pad', e)));
+    }).catch(e => reportFirestore(e, OperationType.UPDATE, `soundPads/${p.id}`, setError)));
     deleteDoc(doc(db, 'soundCategories', category.id))
-      .catch(e => console.error('No se pudo borrar la categoría', e));
+      .catch(e => reportFirestore(e, OperationType.DELETE, `soundCategories/${category.id}`, setError));
   }, [pads]);
 
   // ── Acciones sobre el motor ────────────────────────────────────────────────
 
-  const playPad = useCallback(async (pad: SoundPad) => {
+  /** Dispara un pad. Devuelve el id de la voz, o `null` si no llegó a sonar. */
+  const playPad = useCallback(async (pad: SoundPad): Promise<string | null> => {
     try {
-      await soundpadEngine.play(pad);
+      const voiceId = await soundpadEngine.play(pad);
       setError(null);
+      return voiceId;
     } catch (e) {
       if (e instanceof MissingAudioError) {
         setMissingIds(prev => new Set(prev).add(pad.id));
@@ -258,6 +290,7 @@ export function useSoundpad() {
         console.error('No se pudo reproducir el pad', e);
         setError(e instanceof Error ? e.message : String(e));
       }
+      return null;
     }
   }, []);
 
@@ -294,30 +327,40 @@ export function useSoundpad() {
       categoryIds: new Set(categories.map(c => c.id)),
     });
 
+    // Protegerlas de `pruneOrphans` hasta que sus fichas lleguen, e invalidar el
+    // buffer de las que ya estaban decodificadas: el pack pudo traer otro audio
+    // bajo la misma clave y si no, el pad seguiría sonando con el viejo.
+    result.importedKeys.forEach(k => {
+      ownKeys.current.add(k);
+      soundpadEngine.forget(k);
+    });
+
     result.newCategories.forEach(c => {
       setDoc(doc(db, 'soundCategories', c.id), {
-        name: c.name.slice(0, 39),
+        name: c.name,
         color: c.color,
-        order: c.order ?? 0,
+        order: c.order,
         ownerId: user.uid,
         createdAt: serverTimestamp(),
-      }).catch(e => console.error('No se pudo crear la categoría del pack', e));
+      }).catch(e => reportFirestore(e, OperationType.CREATE, `soundCategories/${c.id}`, setError));
     });
 
     result.newPads.forEach(p => {
       addDoc(collection(db, 'soundPads'), {
         ...p,
-        name: p.name.slice(0, 59),
         ownerId: user.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      }).catch(e => console.error('No se pudo crear el pad del pack', e));
+      }).catch(e => reportFirestore(e, OperationType.CREATE, 'soundPads', setError));
     });
 
-    // Los pads que ya existían y estaban sin audio ahora sí lo tienen: forzar
-    // que se vuelvan a decodificar en la próxima pasada.
+    // El estado de "falta el audio" se RECALCULA contra lo que hay realmente en
+    // el dispositivo. Limpiarlo sin más mentía: importar un pack incompleto
+    // dejaba el tablero con pinta de sano y el fallo aparecía recién al tocar el
+    // pad, en plena ceremonia.
     preloadedFor.current = '';
-    setMissingIds(new Set());
+    const { missing } = await soundpadEngine.preload(pads);
+    setMissingIds(new Set(missing));
 
     return { audios: result.audios, created: result.newPads.length };
   }, [user, pads, categories]);
@@ -325,6 +368,18 @@ export function useSoundpad() {
   const refreshUsage = useCallback(() => {
     estimateUsage().then(setUsage).catch(() => {});
   }, []);
+
+  // Estos cierres van envueltos porque el tablero los usa como dependencias de
+  // efectos: recrearlos en cada render hacía que el intervalo del progreso se
+  // destruyera y se volviera a crear unas doce veces por segundo.
+  const stopPad = useCallback((padId: string) => soundpadEngine.stopPad(padId), []);
+  const stopVoice = useCallback((voiceId: string) => soundpadEngine.stopVoice(voiceId), []);
+  /** Pánico: cada voz se apaga con su propio fundido. */
+  const stopAll = useCallback(() => soundpadEngine.stopAll(), []);
+  /** Retira un disparo que resultó ser el comienzo de un desplazamiento. */
+  const retract = useCallback((voiceId: string) => soundpadEngine.retract(voiceId), []);
+  /** Reloj del AudioContext, para calcular el progreso de las voces. */
+  const clock = useCallback(() => soundpadEngine.now(), []);
 
   const state: SoundpadState = useMemo(() => ({
     pads, categories, loading: loadingPads || loadingCats,
@@ -336,11 +391,7 @@ export function useSoundpad() {
     createPad, updatePad, deletePad, toggleFavorite,
     createCategory, updateCategory, deleteCategory,
     playPad,
-    stopPad: (padId: string) => soundpadEngine.stopPad(padId),
-    stopVoice: (voiceId: string) => soundpadEngine.stopVoice(voiceId),
-    stopAll: () => soundpadEngine.stopAll(0.06),
-    /** Reloj del AudioContext, para calcular el progreso de las voces. */
-    clock: () => soundpadEngine.now(),
+    stopPad, stopVoice, stopAll, retract, clock,
     setMasterVolume, refreshUsage, setError,
     downloadPack, loadPack,
   };

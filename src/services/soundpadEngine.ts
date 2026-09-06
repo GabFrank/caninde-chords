@@ -77,6 +77,12 @@ export interface ActiveVoice {
 interface Voice extends ActiveVoice {
   source: AudioBufferSourceNode;
   gain: GainNode;
+  /**
+   * Fundido de ESTA voz al ser apagada, en segundos. Es del pad que suena, no
+   * del que lo corta: si la lluvia se configuró para apagarse en tres segundos,
+   * tiene que apagarse en tres segundos la corte quien la corte.
+   */
+  fadeSec: number;
 }
 
 type Listener = (voices: ActiveVoice[]) => void;
@@ -200,7 +206,7 @@ export class SoundpadEngine {
     const buffer = await this.ensureBuffer(pad.fileKey);
 
     for (const voice of voicesToCut(pad, [...this.voices.values()])) {
-      this.fadeOutVoice(voice, resolveFadeSec(pad));
+      this.fadeOutVoice(voice);
     }
 
     const now = ctx.currentTime;
@@ -227,6 +233,7 @@ export class SoundpadEngine {
       endsAt: stopAfterSec === null ? null : now + stopAfterSec,
       source,
       gain,
+      fadeSec: resolveFadeSec(pad),
     };
     this.voices.set(voiceId, voice);
     source.onended = () => {
@@ -237,29 +244,53 @@ export class SoundpadEngine {
     return voiceId;
   }
 
-  /** Para una voz concreta con un fundido corto. */
-  stopVoice(voiceId: string, fadeSec = DEFAULT_FADE_MS / 1000): void {
+  /** Para una voz concreta. Sin `fadeSec`, con el fundido propio del pad. */
+  stopVoice(voiceId: string, fadeSec?: number): void {
     const voice = this.voices.get(voiceId);
-    if (voice) this.fadeOutVoice(voice, fadeSec);
+    if (!voice) return;
+    this.fadeOutVoice(voice, fadeSec);
+    this.notify();
   }
 
   /** Para todas las voces de un pad (puede haber varias si es de overlay). */
-  stopPad(padId: string, fadeSec = DEFAULT_FADE_MS / 1000): void {
+  stopPad(padId: string, fadeSec?: number): void {
     for (const voice of this.voices.values()) {
       if (voice.padId === padId) this.fadeOutVoice(voice, fadeSec);
     }
+    this.notify();
   }
 
-  /** Pánico: silencio inmediato. */
-  stopAll(fadeSec = DEFAULT_FADE_MS / 1000): void {
+  /**
+   * Pánico: silencio. Usa el fundido propio de cada voz salvo que se imponga
+   * uno, para que un ambiente con fundido largo no se corte en seco.
+   */
+  stopAll(fadeSec?: number): void {
     for (const voice of this.voices.values()) this.fadeOutVoice(voice, fadeSec);
+    // Un solo aviso para todas: ocho voces no deben producir ocho renders.
+    this.notify();
   }
 
-  private fadeOutVoice(voice: Voice, fadeSec: number): void {
+  /**
+   * Retira un disparo que resultó ser el comienzo de un desplazamiento. Corta de
+   * inmediato, sin el fundido del pad: la idea es que el sonido no llegue a
+   * oírse, no que se apague con gracia.
+   */
+  retract(voiceId: string): void {
+    const voice = this.voices.get(voiceId);
+    if (!voice) return;
+    this.fadeOutVoice(voice, 0.015);
+    this.notify();
+  }
+
+  /**
+   * Apaga una voz. Sin `overrideSec`, usa el fundido configurado en el pad que
+   * la originó; sólo el pánico y el retiro de un disparo accidental imponen uno.
+   */
+  private fadeOutVoice(voice: Voice, overrideSec?: number): void {
     const ctx = this.ctx;
     if (!ctx) return;
     const now = ctx.currentTime;
-    const end = now + Math.max(0.01, fadeSec);
+    const end = now + Math.max(0.01, overrideSec ?? voice.fadeSec);
     try {
       voice.gain.gain.cancelScheduledValues(now);
       voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
@@ -277,7 +308,6 @@ export class SoundpadEngine {
     // La voz sale del registro cuando `onended` dispara, al terminar el fundido.
     // Adelantar `endsAt` hace que la barra de progreso muestre el apagado.
     voice.endsAt = end;
-    this.notify();
   }
 
   isPadPlaying(padId: string): boolean {
@@ -315,8 +345,18 @@ export class SoundpadEngine {
 
   // ── Observación desde React ────────────────────────────────────────────────
 
+  /**
+   * Observa las voces activas. El oyente recibe el estado ACTUAL al suscribirse,
+   * no sólo los cambios posteriores.
+   *
+   * El motor es un singleton que sobrevive al desmontaje del tablero: sin esta
+   * entrega inicial, salir a otra pestaña y volver dejaba un bucle sonando que
+   * la interfaz no veía —ningún pad marcado, botón de pánico deshabilitado— y
+   * sin forma de pararlo salvo recargando la página.
+   */
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
+    try { listener(this.getVoices()); } catch (e) { console.error('Listener del soundpad falló', e); }
     return () => { this.listeners.delete(listener); };
   }
 

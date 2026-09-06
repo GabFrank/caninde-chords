@@ -42,12 +42,31 @@ function openDB(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
+/**
+ * Ejecuta una operación sobre el almacén.
+ *
+ * En escritura se espera al `complete` de la transacción, no al `success` de la
+ * petición: una petición puede tener éxito y la transacción abortar después (por
+ * cuota agotada al confirmar, por ejemplo). Dar el archivo por guardado antes
+ * de tiempo haría que se creara la ficha de un pad cuyo audio no llegó al disco.
+ *
+ * Y `onabort` se escucha siempre: sin él, un aborto que no pasa por `onerror`
+ * dejaba la promesa sin asentarse nunca y el formulario colgado en "guardando".
+ */
 function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   return openDB().then(db => new Promise<T>((resolve, reject) => {
     const transaction = db.transaction(STORE, mode);
+    const fail = (e: unknown) => reject(e instanceof Error ? e : new Error('Falló la operación en IndexedDB.'));
+    let result: T;
     const req = run(transaction.objectStore(STORE));
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error('Fallo la operación en IndexedDB.'));
+    req.onsuccess = () => {
+      result = req.result;
+      if (mode === 'readonly') resolve(result);
+    };
+    req.onerror = () => fail(req.error);
+    transaction.oncomplete = () => resolve(result);
+    transaction.onabort = () => fail(transaction.error ?? new Error('La transacción de IndexedDB se abortó.'));
+    transaction.onerror = () => fail(transaction.error);
   }));
 }
 
@@ -76,16 +95,26 @@ export function listKeys(): Promise<string[]> {
 }
 
 /**
- * Borra los audios que ya no referencia ningún pad. Se llama al arrancar el
- * Soundpad: si un pad se borró desde otro dispositivo, su archivo queda acá
- * ocupando cuota sin que nada lo apunte.
+ * Borra los audios que ya no referencia ningún pad: si un pad se borró desde
+ * otro dispositivo, su archivo queda acá ocupando cuota sin que nada lo apunte.
+ *
+ * `protectedKeys` es imprescindible, no un adorno. El audio se guarda ANTES de
+ * que exista la ficha del pad, así que durante esa ventana el archivo recién
+ * escrito parece huérfano; sin protegerlo, un snapshot de Firestore que llegue
+ * en ese instante (por ejemplo un pad creado en otro dispositivo) haría que se
+ * borre el archivo que el usuario acaba de elegir.
  */
-export async function pruneOrphans(usedKeys: string[]): Promise<number> {
-  const used = new Set(usedKeys);
-  const keys = await listKeys();
-  const orphans = keys.filter(k => !used.has(k));
+export async function pruneOrphans(usedKeys: string[], protectedKeys: Iterable<string> = []): Promise<number> {
+  const orphans = selectOrphans(await listKeys(), usedKeys, protectedKeys);
   await Promise.all(orphans.map(k => deleteSound(k)));
   return orphans.length;
+}
+
+/** La decisión de qué borrar, separada para poder probarla. */
+export function selectOrphans(allKeys: string[], usedKeys: string[], protectedKeys: Iterable<string> = []): string[] {
+  const keep = new Set(usedKeys);
+  for (const k of protectedKeys) keep.add(k);
+  return allKeys.filter(k => !keep.has(k));
 }
 
 export interface StorageUsage {

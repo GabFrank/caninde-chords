@@ -150,10 +150,16 @@ describe('SoundpadEngine', () => {
     engine = new SoundpadEngine(() => ctx as unknown as AudioContext);
   });
 
-  it('un pad de overlay deja sonando lo anterior', async () => {
+  it('un pad de overlay NO toca lo que ya estaba sonando', async () => {
     await engine.play(makePad({ id: 'a', fileKey: 'k1', overlay: true, repeat: 0 }));
+    const previa = ctx.sources[0];
+
     await engine.play(makePad({ id: 'b', fileKey: 'k2', overlay: true, repeat: 0 }));
 
+    // Que la voz siga en el registro no alcanza como prueba: `fadeOutVoice` la
+    // saca recién en `onended`, que el doble no dispara. Lo que demuestra que no
+    // se la cortó es que nadie le programó un stop().
+    expect(previa.stopped).toBeNull();
     expect(engine.getVoices().map(v => v.padId).sort()).toEqual(['a', 'b']);
   });
 
@@ -163,10 +169,52 @@ describe('SoundpadEngine', () => {
     expect(previa.stopped).toBeNull();
 
     ctx.currentTime = 5;
-    await engine.play(makePad({ id: 'b', fileKey: 'k2', overlay: false, fadeOutMs: 200 }));
+    await engine.play(makePad({ id: 'b', fileKey: 'k2', overlay: false }));
 
-    // La voz anterior se apaga con fundido, no de golpe.
-    expect(previa.stopped).toBeCloseTo(5.2);
+    // Se apaga con fundido, no de golpe.
+    expect(previa.stopped).toBeGreaterThan(5);
+  });
+
+  it('el fundido es el del pad que se apaga, no el del que lo corta', async () => {
+    // La lluvia se configuró para apagarse en 3 s; la corte quien la corte, se
+    // tiene que apagar en 3 s.
+    await engine.play(makePad({ id: 'lluvia', fileKey: 'k1', overlay: true, repeat: 0, fadeOutMs: 3000 }));
+    const lluvia = ctx.sources[0];
+
+    ctx.currentTime = 10;
+    await engine.play(makePad({ id: 'trueno', fileKey: 'k2', overlay: false, fadeOutMs: 50 }));
+
+    expect(lluvia.stopped).toBeCloseTo(13);
+  });
+
+  it('el pánico apaga cada voz con su propio fundido', async () => {
+    await engine.play(makePad({ id: 'a', fileKey: 'k1', overlay: true, repeat: 0, fadeOutMs: 100 }));
+    await engine.play(makePad({ id: 'b', fileKey: 'k2', overlay: true, repeat: 0, fadeOutMs: 2000 }));
+
+    engine.stopAll();
+
+    expect(ctx.sources.map(s => s.stopped)).toEqual([0.1, 2]);
+  });
+
+  it('una sola pasada no usa bucle y para al final del audio', async () => {
+    await engine.play(makePad({ repeat: 1 }));
+    const src = ctx.sources[0];
+    expect(src.loop).toBe(false);
+    expect(src.stopped).toBeCloseTo(2); // el buffer del doble dura 2 s
+  });
+
+  it('tres repeticiones son una única fuente en bucle parada a los 6 s', async () => {
+    await engine.play(makePad({ repeat: 3 }));
+    expect(ctx.sources).toHaveLength(1);
+    expect(ctx.sources[0].loop).toBe(true);
+    expect(ctx.sources[0].stopped).toBeCloseTo(6);
+  });
+
+  it('el bucle indefinido no programa ningún final', async () => {
+    await engine.play(makePad({ repeat: 0 }));
+    expect(ctx.sources[0].loop).toBe(true);
+    expect(ctx.sources[0].stopped).toBeNull();
+    expect(engine.getVoices()[0].endsAt).toBeNull();
   });
 
   it('la voz desaparece del registro cuando termina', async () => {
@@ -188,6 +236,18 @@ describe('SoundpadEngine', () => {
     expect(engine.getMasterVolume()).toBe(0.9);
   });
 
+  it('quien se suscribe recibe lo que YA está sonando', async () => {
+    // Es el fallo que dejaba un bucle imposible de parar: el tablero se
+    // desmontaba al cambiar de pestaña y al volver se suscribía en cero, sin
+    // ver la voz viva, con el botón de pánico deshabilitado.
+    await engine.play(makePad({ id: 'lluvia', repeat: 0 }));
+
+    let recibido: string[] = [];
+    engine.subscribe(voces => { recibido = voces.map(v => v.padId); });
+
+    expect(recibido).toEqual(['lluvia']);
+  });
+
   it('avisa a los suscriptores al disparar y al terminar', async () => {
     const visto: number[] = [];
     engine.subscribe(voices => visto.push(voices.length));
@@ -195,16 +255,17 @@ describe('SoundpadEngine', () => {
     await engine.play(makePad({ id: 'a' }));
     ctx.sources[0].finish();
 
-    expect(visto).toEqual([1, 0]);
+    // El primer 0 es la entrega inicial de subscribe().
+    expect(visto).toEqual([0, 1, 0]);
   });
 
-  it('el pánico programa el corte de todas las voces', async () => {
-    await engine.play(makePad({ id: 'a', fileKey: 'k1', overlay: true, repeat: 0 }));
-    await engine.play(makePad({ id: 'b', fileKey: 'k2', overlay: true, repeat: 0 }));
+  it('retirar un disparo lo corta de inmediato, sin el fundido del pad', async () => {
+    // Un pad disparado sin querer al empezar a desplazar la grilla: la idea es
+    // que no llegue a oírse, no que se apague con gracia.
+    const voiceId = await engine.play(makePad({ fadeOutMs: 3000 }));
+    engine.retract(voiceId!);
 
-    engine.stopAll(0.05);
-
-    expect(ctx.sources.map(s => s.stopped)).toEqual([0.05, 0.05]);
+    expect(ctx.sources[0].stopped).toBeCloseTo(0.015);
   });
 
   it('un audio que no está en este dispositivo se distingue de un fallo real', async () => {
@@ -219,10 +280,22 @@ describe('SoundpadEngine', () => {
     expect(missing).toEqual(['roto']);
   });
 
-  it('decodifica una sola vez por archivo', async () => {
+  it('dos disparos simultáneos del mismo archivo lo decodifican una sola vez', async () => {
+    // Sin `await` entre medio: es el caso que ejercita la deduplicación de
+    // decodificaciones en vuelo, que el caché de buffers por sí solo no cubre.
+    const spy = vi.spyOn(ctx, 'decodeAudioData');
+    await Promise.all([
+      engine.play(makePad({ id: 'a', fileKey: 'k1', overlay: true })),
+      engine.play(makePad({ id: 'b', fileKey: 'k1', overlay: true })),
+    ]);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('olvidar un archivo obliga a decodificarlo otra vez', async () => {
     const spy = vi.spyOn(ctx, 'decodeAudioData');
     await engine.play(makePad({ fileKey: 'k1' }));
+    engine.forget('k1');
     await engine.play(makePad({ fileKey: 'k1' }));
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 });

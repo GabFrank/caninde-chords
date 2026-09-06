@@ -49,6 +49,8 @@ export interface ImportResult {
   /** Fichas del pack que no existían acá y hay que crear en Firestore. */
   newPads: PackPad[];
   newCategories: { id: string; name: string; color: string; order: number }[];
+  /** Claves escritas en este dispositivo, para invalidar buffers y protegerlas. */
+  importedKeys: string[];
 }
 
 /**
@@ -100,6 +102,48 @@ export async function exportPack(pads: SoundPad[], categories: SoundCategory[]):
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 1 } });
 }
 
+/** Un id de documento de Firestore válido y sin sorpresas de ruta. */
+function isSafeId(id: unknown): id is string {
+  return typeof id === 'string' && id.length > 0 && id.length < 128
+    && !id.includes('/') && id !== '.' && id !== '..';
+}
+
+const num = (v: unknown, fallback: number, min: number, max: number) =>
+  (typeof v === 'number' && Number.isFinite(v)) ? Math.max(min, Math.min(max, v)) : fallback;
+
+/**
+ * Normaliza una ficha del manifiesto. El .zip lo trae el usuario, así que sus
+ * campos son entrada no confiable: escribirlos tal cual en Firestore hace que
+ * las reglas rechacen la creación entera por un `volume` que venía como texto, y
+ * el usuario sólo vería un "importado" que no importó nada.
+ *
+ * Devuelve `null` si la ficha no es recuperable.
+ */
+function sanitizePackPad(raw: unknown): PackPad | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const p = raw as Record<string, unknown>;
+  if (typeof p.fileKey !== 'string' || !p.fileKey) return null;
+  const name = typeof p.name === 'string' && p.name.trim() ? p.name.trim().slice(0, 59) : 'Sin nombre';
+  return {
+    name,
+    categoryId: isSafeId(p.categoryId) ? p.categoryId : 'uncategorized',
+    color: typeof p.color === 'string' ? p.color.slice(0, 23) : undefined,
+    icon: typeof p.icon === 'string' ? p.icon.slice(0, 23) : undefined,
+    fileKey: p.fileKey.slice(0, 199),
+    fileName: typeof p.fileName === 'string' ? p.fileName.slice(0, 199) : name,
+    fileSize: num(p.fileSize, 0, 0, Number.MAX_SAFE_INTEGER),
+    durationMs: typeof p.durationMs === 'number' && Number.isFinite(p.durationMs) ? p.durationMs : undefined,
+    volume: num(p.volume, 0.85, 0, 1),
+    // Entero: `repeat: 0.5` daría un `stop()` en el mismo instante del `start()`
+    // y el pad no sonaría nunca.
+    repeat: Math.round(num(p.repeat, 1, 0, 50)),
+    overlay: typeof p.overlay === 'boolean' ? p.overlay : true,
+    fadeOutMs: num(p.fadeOutMs, 120, 0, 5000),
+    favorite: p.favorite === true,
+    order: num(p.order, 0, 0, Number.MAX_SAFE_INTEGER),
+  };
+}
+
 /**
  * Lee un pack: escribe los audios en este dispositivo y devuelve qué fichas
  * faltan crear. No toca Firestore — de eso se ocupa quien llama, que es el que
@@ -123,20 +167,32 @@ export async function importPack(file: File | Blob, existing: { fileKeys: Set<st
 
   let audios = 0;
   const newPads: PackPad[] = [];
+  const importedKeys: string[] = [];
 
-  for (const pad of manifest.pads) {
+  for (const raw of manifest.pads) {
+    const pad = sanitizePackPad(raw);
+    if (!pad) continue;
     const entry = zip.file(AUDIO_DIR + pad.fileKey);
     if (!entry) continue;
     // Se reescribe siempre: si la ficha ya llegó por Firestore pero sin audio,
     // esto es exactamente lo que la desbloquea.
     await putSound(pad.fileKey, new Blob([await entry.async('arraybuffer')]));
     audios++;
+    importedKeys.push(pad.fileKey);
     if (!existing.fileKeys.has(pad.fileKey)) newPads.push(pad);
   }
 
-  const newCategories = (manifest.categories ?? []).filter(c => !existing.categoryIds.has(c.id));
+  const newCategories = (manifest.categories ?? [])
+    .filter(c => c && isSafeId(c.id) && typeof c.name === 'string' && c.name.trim())
+    .filter(c => !existing.categoryIds.has(c.id))
+    .map(c => ({
+      id: c.id,
+      name: c.name.trim().slice(0, 39),
+      color: typeof c.color === 'string' ? c.color.slice(0, 23) : 'slate',
+      order: num(c.order, 0, 0, Number.MAX_SAFE_INTEGER),
+    }));
 
-  return { audios, newPads, newCategories };
+  return { audios, newPads, newCategories, importedKeys };
 }
 
 /** Nombre sugerido para el archivo exportado. */
