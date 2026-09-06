@@ -29,40 +29,20 @@ con Google, en **[AUTH.md](AUTH.md)**.
 - **Integridad de Datos:** Al compartir, nos aseguramos de que el orden de las canciones se mantenga exacto reconstruyendo el array de datos en base al orden de `songIds`.
 
 ### 4. Soundpad (Utilitarios)
-- **Concepto:** pads para disparar sonidos (naturaleza, animales, truenos) durante
-  sesiones y ceremonias.
-- **El audio vive en el dispositivo, la ficha en la nube.** Los archivos van a
-  IndexedDB (`src/services/soundLibrary.ts`, base `caninde-sounds`); en Firestore
-  (`soundPads`, `soundCategories`) va sólo el catálogo. La razón: Cloud Storage
-  exige plan Blaze desde feb-2026, y en el escenario el sonido tiene que salir sin
-  depender de la conexión del lugar.
-- **Consecuencia:** una ficha puede llegar desde otro dispositivo sin su audio. El
-  pad se marca "falta el audio" y se arregla revinculando el archivo o importando
-  el pack `.zip` (`src/services/soundpadPack.ts`), que conserva los `fileKey` para
-  que el pad se complete en vez de duplicarse.
-- **Motor propio.** `soundpadEngine.ts` no pasa por `audioEngine.ts`: la cadena
-  del afinador colorea la señal para sonar a guitarra y eso destrozaría un trueno.
-  Comparten el `AudioContext` de `audioContext.ts`.
-- **Repeticiones:** una sola fuente en bucle con el `stop()` programado al final.
-  Nunca encadenar un `AudioBufferSourceNode` por pasada: el error de cada
-  `start()` se acumula y se oye el hueco.
-- **Overlay vs exclusivo:** un pad exclusivo apaga lo anterior con un fundido
-  corto, nunca de golpe (el corte en seco chasquea en un equipo de sala).
-- **Escrituras optimistas:** las llamadas a Firestore del Soundpad NO se esperan.
-  Con persistencia offline el cambio se aplica a la caché local al instante, pero
-  la promesa sólo resuelve cuando confirma el servidor; esperarla cuelga la
-  interfaz justo en el lugar de la ceremonia, con mala conexión. Consecuencia
-  obligatoria: el audio se escribe ANTES de que exista su ficha, así que toda
-  clave recién escrita va PROTEGIDA de `pruneOrphans` (`ownKeys` en
-  `useSoundpad.ts`) o se borra sola.
-- **Disparo táctil:** el pad dispara en `pointerdown` para no tener latencia, y
-  RETIRA el sonido si el gesto se revela como arrastre (`pointermove` > 10px o
-  `pointercancel`). Sin eso, desplazarse por la grilla disparaba un trueno. El
-  `touch-action` del pad debe ser `pan-y`: con `none` la grilla no se desplaza y
-  con `manipulation` el navegador no avisa del arrastre.
-- **Nada puede empujar la grilla.** La franja "Sonando" ocupa un alto fijo aunque
-  no haya nada sonando, y los avisos van debajo del tablero: un salto de 70px con
-  pads de 88px hace que el operador toque el pad equivocado justo al disparar.
+- **Concepto:** pads para disparar sonidos (naturaleza, animales, truenos)
+  durante sesiones y ceremonias, con volumen, repeticiones y overlay por sonido.
+- **La decisión que explica el módulo:** el audio vive en IndexedDB, en cada
+  dispositivo; en Firestore (`soundPads`, `soundCategories`) va sólo la ficha.
+  Cloud Storage exige plan Blaze desde feb-2026, y en el escenario el sonido
+  tiene que salir sin depender de la conexión del lugar.
+- **Consecuencia:** una ficha puede llegar desde otro dispositivo sin su audio.
+  El pad se marca "falta el audio" y se arregla revinculando el archivo o
+  importando el pack `.zip`.
+- **Antes de tocar este módulo, leé [docs/SOUNDPAD.md](docs/SOUNDPAD.md).** Están
+  ahí los diez gotchas que costaron un fallo real cada uno: por qué toda clave
+  recién escrita va protegida de `pruneOrphans`, por qué `subscribe()` entrega el
+  estado actual, por qué las repeticiones son una sola fuente en bucle, por qué
+  el disparo táctil se retira, y por qué nada puede empujar la grilla.
 
 ## 🛠 Reglas Técnicas Obligatorias
 
@@ -110,7 +90,8 @@ con Google, en **[AUTH.md](AUTH.md)**.
 - `npm run build && npm run smoke` — prueba de humo de interfaz en cuatro viewports.
 - `npm run build && npm run soundpad` — prueba funcional del Soundpad en un
   navegador real, con la red caída a propósito: disparo, overlay vs exclusivo,
-  pánico, persistencia en IndexedDB e ida y vuelta del pack `.zip`.
+  pánico, persistencia en IndexedDB e ida y vuelta del pack `.zip`. Detalle en
+  [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
 
 ## 📋 TODO Prioritario
 Ver archivo `TODO.md` para el backlog detallado de mejoras de Director Mode y estabilidad.

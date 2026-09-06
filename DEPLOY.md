@@ -37,7 +37,7 @@ Pasos del workflow, en orden:
 | Checkout | `fetch-depth: 0`, semantic-release necesita historial y tags |
 | Setup Node 22 | con caché de npm |
 | `npm ci` | |
-| `npm test` | vitest sobre el Harmony Engine; es la única compuerta de calidad |
+| `npm test` | vitest sobre la lógica pura (motor del soundpad, pack, viewport); es la única compuerta de calidad del workflow |
 | `npx semantic-release` | versión, `CHANGELOG.md`, tag y release de GitHub |
 | `npm run build` | Vite; genera `dist/` y `version.json` |
 | Deploy a Hosting | `FirebaseExtended/action-hosting-deploy`, canal `live` |
@@ -46,6 +46,9 @@ Pasos del workflow, en orden:
 > ⚠️ El paso de reglas es tolerante a fallos: si la cuenta de servicio pierde
 > permisos, el workflow queda en verde y las reglas quedan desactualizadas sin
 > avisar. Si cambiás `firestore.rules`, confirmá en los logs que ese paso corrió.
+> Esto muerde especialmente al **Soundpad**: sin sus reglas publicadas, todo el
+> módulo da `permission-denied`. El procedimiento de comprobación está en
+> [docs/SOUNDPAD.md](docs/SOUNDPAD.md#publicar).
 
 No hay entorno de staging ni previews por PR: cada push a `main` va directo a
 producción.
