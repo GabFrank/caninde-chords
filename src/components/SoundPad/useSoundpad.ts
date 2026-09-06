@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, updateDoc, where,
+  addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { useAuth } from '../AuthProvider';
@@ -15,6 +15,7 @@ import {
   deleteSound, estimateUsage, makeFileKey, pruneOrphans, putSound, readDurationMs, StorageUsage,
 } from '../../services/soundLibrary';
 import { ActiveVoice, MissingAudioError, soundpadEngine } from '../../services/soundpadEngine';
+import { exportPack, importPack, packFileName } from '../../services/soundpadPack';
 import { DEFAULT_COLOR_ID, DEFAULT_ICON_ID, UNCATEGORIZED_ID } from '../../lib/soundpadStyles';
 
 export type PadDraft = Omit<SoundPad, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'>;
@@ -265,6 +266,62 @@ export function useSoundpad() {
     setMasterVolumeState(soundpadEngine.getMasterVolume());
   }, []);
 
+  // ── Pack .zip ──────────────────────────────────────────────────────────────
+
+  /** Arma el pack y lo entrega al navegador como descarga. */
+  const downloadPack = useCallback(async () => {
+    const blob = await exportPack(pads, categories);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = packFileName();
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Liberar enseguida cancelaría la descarga en algunos navegadores.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }, [pads, categories]);
+
+  /**
+   * Importa un pack: los audios van al dispositivo y las fichas que falten se
+   * crean en Firestore conservando sus ids, para que un pad que ya llegó desde
+   * otro dispositivo recupere su audio en vez de duplicarse.
+   */
+  const loadPack = useCallback(async (file: File) => {
+    if (!user) return { audios: 0, created: 0 };
+    const result = await importPack(file, {
+      fileKeys: new Set(pads.map(p => p.fileKey)),
+      categoryIds: new Set(categories.map(c => c.id)),
+    });
+
+    result.newCategories.forEach(c => {
+      setDoc(doc(db, 'soundCategories', c.id), {
+        name: c.name.slice(0, 39),
+        color: c.color,
+        order: c.order ?? 0,
+        ownerId: user.uid,
+        createdAt: serverTimestamp(),
+      }).catch(e => console.error('No se pudo crear la categoría del pack', e));
+    });
+
+    result.newPads.forEach(p => {
+      addDoc(collection(db, 'soundPads'), {
+        ...p,
+        name: p.name.slice(0, 59),
+        ownerId: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }).catch(e => console.error('No se pudo crear el pad del pack', e));
+    });
+
+    // Los pads que ya existían y estaban sin audio ahora sí lo tienen: forzar
+    // que se vuelvan a decodificar en la próxima pasada.
+    preloadedFor.current = '';
+    setMissingIds(new Set());
+
+    return { audios: result.audios, created: result.newPads.length };
+  }, [user, pads, categories]);
+
   const refreshUsage = useCallback(() => {
     estimateUsage().then(setUsage).catch(() => {});
   }, []);
@@ -285,5 +342,6 @@ export function useSoundpad() {
     /** Reloj del AudioContext, para calcular el progreso de las voces. */
     clock: () => soundpadEngine.now(),
     setMasterVolume, refreshUsage, setError,
+    downloadPack, loadPack,
   };
 }

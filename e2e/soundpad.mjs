@@ -13,7 +13,8 @@
  * Firebase Auth, igual que en `smoke.mjs`.
  */
 import { chromium } from 'playwright';
-import { readFileSync, existsSync, statSync } from 'fs';
+import { readFileSync, existsSync, statSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import { createServer } from 'http';
 import { extname, join, normalize } from 'path';
 
@@ -102,7 +103,7 @@ check('el Afinador sigue disponible', await page.getByRole('button', { name: /^(
 // Alta de un sonido
 await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
 await page.waitForTimeout(300);
-await page.locator('input[type=file]').setInputFiles(WAV);
+await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
 await page.waitForTimeout(300);
 await page.locator('#pad-name').fill('Trueno lejano');
 await page.locator('#pad-volume').fill('0.5');
@@ -153,7 +154,7 @@ if (padVisible) {
 async function addPad(name, { overlay, loop }) {
   await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
   await page.waitForTimeout(300);
-  await page.locator('input[type=file]').setInputFiles(WAV);
+  await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
   await page.waitForTimeout(200);
   await page.locator('#pad-name').fill(name);
   if (!overlay) await page.getByRole('button', { name: /Corta todo lo demás|Stops everything/ }).click();
@@ -183,6 +184,57 @@ check('un pad exclusivo corta a los que sonaban', tras === 1, `activos: ${tras}`
 
 await page.waitForTimeout(1200);
 check('un pad de una sola pasada se apaga solo al terminar', await countPlaying() === 0, `activos: ${await countPlaying()}`);
+
+// ── Ida y vuelta del pack ────────────────────────────────────────────────────
+// Es el único camino para llevar los audios a otro dispositivo, así que se prueba
+// el escenario completo: exportar, perder los audios, importar y volver a sonar.
+const packPath = join(tmpdir(), `soundpad-e2e-${Date.now()}.zip`);
+const download = page.waitForEvent('download', { timeout: 20000 });
+await page.getByRole('button', { name: /Exportar pack|Export pack/ }).click();
+await (await download).saveAs(packPath);
+check('el pack se descarga', existsSync(packPath) && statSync(packPath).size > 0);
+
+const borrarAudios = () => page.evaluate(() => new Promise(res => {
+  const open = indexedDB.open('caninde-sounds');
+  open.onsuccess = () => {
+    const db = open.result;
+    const tx = db.transaction('blobs', 'readwrite');
+    tx.objectStore('blobs').clear();
+    tx.oncomplete = () => { db.close(); res(true); };
+  };
+  open.onerror = () => res(false);
+}));
+const clavesGuardadas = () => page.evaluate(() => new Promise(res => {
+  const open = indexedDB.open('caninde-sounds');
+  open.onsuccess = () => {
+    const db = open.result;
+    const req = db.transaction('blobs', 'readonly').objectStore('blobs').getAllKeys();
+    req.onsuccess = () => { const n = req.result.length; db.close(); res(n); };
+  };
+  open.onerror = () => res(-1);
+}));
+
+// Simula el dispositivo nuevo: las fichas llegaron por Firestore, los audios no.
+await borrarAudios();
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('[data-mode]', { timeout: 20000 });
+await page.getByRole('button', { name: /Utilitarios|Utilities/ }).first().click();
+await page.waitForTimeout(1200);
+check('sin los audios, los pads avisan que falta el archivo',
+  await page.getByText(/La ficha del sonido se sincronizó|The sound card is synced/).count() > 0);
+
+await page.locator('input[type=file][accept*="zip"]').setInputFiles(packPath);
+await page.waitForTimeout(2500);
+const restaurados = await clavesGuardadas();
+check('importar el pack devuelve los audios al dispositivo', restaurados === 4, `claves: ${restaurados}`);
+check('el aviso de audio faltante desaparece',
+  await page.getByText(/La ficha del sonido se sincronizó|The sound card is synced/).count() === 0);
+
+await page.getByRole('button', { name: /^Trueno lejano/ }).first().dispatchEvent('pointerdown');
+await page.waitForTimeout(500);
+check('un pad restaurado desde el pack vuelve a sonar', await countPlaying() === 1);
+await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
+rmSync(packPath, { force: true });
 
 check('sin errores de JavaScript', errs.length === 0, errs.join(' | '));
 

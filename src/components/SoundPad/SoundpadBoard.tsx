@@ -7,6 +7,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Search, Square, Star, Tags, Volume2, HardDrive, AlertTriangle, X,
+  Download, Upload,
 } from 'lucide-react';
 import { useAuth } from '../AuthProvider';
 import { SoundPad } from '../../types';
@@ -35,6 +36,9 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
   const [editing, setEditing] = useState<{ open: boolean; pad: SoundPad | null }>({ open: false, pad: null });
   const [showCategories, setShowCategories] = useState(false);
   const [clock, setClock] = useState(0);
+  const [packBusy, setPackBusy] = useState<'export' | 'import' | null>(null);
+  const [packNote, setPackNote] = useState<string | null>(null);
+  const packInput = useRef<HTMLInputElement>(null);
 
   // El progreso se refresca sólo mientras hay algo sonando: un intervalo
   // permanente mantendría la pantalla despierta y el móvil caliente sin motivo.
@@ -105,6 +109,37 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
     const total = voice.endsAt - voice.startedAt;
     if (total <= 0) return null;
     return Math.max(0, Math.min(1, (clock - voice.startedAt) / total));
+  };
+
+  const doExport = async () => {
+    if (sp.pads.length === 0) { setPackNote(t.soundpadPackEmpty); return; }
+    setPackBusy('export');
+    setPackNote(null);
+    try {
+      await sp.downloadPack();
+      setPackNote(t.soundpadExported);
+    } catch (e) {
+      setPackNote(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPackBusy(null);
+    }
+  };
+
+  const doImport = async (file: File | null) => {
+    if (!file) return;
+    setPackBusy('import');
+    setPackNote(null);
+    try {
+      const { audios, created } = await sp.loadPack(file);
+      setPackNote(`${t.soundpadImported}: ${audios} · +${created}`);
+    } catch (e) {
+      setPackNote(e instanceof Error && e.message === 'pack-invalido'
+        ? t.soundpadPackInvalid
+        : (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setPackBusy(null);
+      if (packInput.current) packInput.current.value = '';
+    }
   };
 
   if (!user) {
@@ -280,15 +315,47 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
         </div>
       )}
 
-      {/* Espacio ocupado: importa saberlo antes de que el navegador lo decida. */}
-      {sp.usage && sp.usage.usedBytes > 0 && (
-        <p className="text-[10px] text-zinc-400 flex items-center gap-1.5 pt-2">
-          <HardDrive size={11} />
-          {t.soundpadStorage}: {formatBytes(sp.usage.usedBytes)}
-          {sp.usage.quotaBytes > 0 && ` / ${formatBytes(sp.usage.quotaBytes)}`}
-          {!sp.usage.persistent && <span className="text-amber-600">· {t.soundpadNotPersistent}</span>}
-        </p>
-      )}
+      {/* Pie: pack y espacio ocupado. Los audios viven en este dispositivo, así
+          que llevarlos a otro y saber cuánto ocupan son parte del trabajo. */}
+      <div className="pt-3 mt-2 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <input
+            ref={packInput}
+            type="file"
+            accept=".zip,application/zip"
+            className="hidden"
+            onChange={(e) => doImport(e.target.files?.[0] ?? null)}
+          />
+          <button
+            type="button"
+            onClick={doExport}
+            disabled={packBusy !== null}
+            className="min-h-9 px-3 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <Download size={12} />
+            {packBusy === 'export' ? t.soundpadExporting : t.soundpadExport}
+          </button>
+          <button
+            type="button"
+            onClick={() => packInput.current?.click()}
+            disabled={packBusy !== null}
+            className="min-h-9 px-3 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <Upload size={12} />
+            {packBusy === 'import' ? t.soundpadImporting : t.soundpadImport}
+          </button>
+          {packNote && <span className="text-[10px] text-zinc-500">{packNote}</span>}
+        </div>
+
+        {sp.usage && sp.usage.usedBytes > 0 && (
+          <p className="text-[10px] text-zinc-400 flex items-center gap-1.5 flex-wrap">
+            <HardDrive size={11} />
+            {t.soundpadStorage}: {formatBytes(sp.usage.usedBytes)}
+            {sp.usage.quotaBytes > 0 && ` / ${formatBytes(sp.usage.quotaBytes)}`}
+            {!sp.usage.persistent && <span className="text-amber-600">· {t.soundpadNotPersistent}</span>}
+          </p>
+        )}
+      </div>
 
       <SoundPadEditor
         open={editing.open}

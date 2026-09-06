@@ -1,5 +1,13 @@
 # Director Mode Edge Cases & Improvements
 
+## 0. Future Work: Soundpad
+- [ ] **Disparo remoto en Modo Director:** que el director dispare un pad y suene
+  en los dispositivos conectados. La infraestructura de sesiones ya existe; falta
+  resolver que los espectadores tengan los mismos audios (pack `.zip`) y la
+  latencia entre dispositivos.
+- [ ] **Reordenar pads arrastrando:** hoy el orden lo fija `order` al crearlos.
+- [ ] **Atajos de teclado / MIDI:** disparar pads sin tocar la pantalla.
+
 ## 0. Future Work: Offline Mode
 - [ ] **Modo Director Offline:** Implementar sincronización P2P utilizando WebRTC para permitir que el director controle a los espectadores en redes locales sin necesidad de internet.
 - [ ] **Heartbeat Robusto:** Mejorar la detección de sesiones activas manejando diferencias de reloj entre dispositivos (lenient skew).
