@@ -47,6 +47,32 @@ service cloud.firestore {
     //
     // ===============================================================
 
+    // Collection: soundPads (Utilitarios - Soundpad de ceremonia)
+    // Document ID: padId
+    // Fields:
+    //   - name: string (required, < 60 chars)
+    //   - categoryId: string (required)
+    //   - fileKey: string (required) — clave del audio en el IndexedDB del
+    //     dispositivo. El MP3 NO se guarda en Firestore ni en Storage.
+    //   - volume: number (required, 0..1)
+    //   - repeat: number (required, 0..50; 0 = bucle)
+    //   - overlay: bool (required)
+    //   - midiNote: number (optional, 0..127) — nota que dispara el pad
+    //   - trimStartMs / trimEndMs: number (optional) — recorte NO destructivo:
+    //     marcas sobre el archivo, que no se modifica
+    //   - favorite: bool (required)
+    //   - ownerId: string (required, immutable)
+    //
+    // Collection: soundCategories (Utilitarios - Soundpad)
+    // Document ID: categoryId
+    // Fields:
+    //   - name: string (required, < 40 chars)
+    //   - color: string (required)
+    //   - order: number (required)
+    //   - ownerId: string (required, immutable)
+    //
+    // ===============================================================
+
     // ===============================================================
     // Helper Functions
     // ===============================================================
@@ -161,6 +187,43 @@ service cloud.firestore {
              data.senderEmail == request.auth.token.email;
     }
 
+    function isValidSoundPad(data) {
+      // `hasOnly` importa especialmente acá: la arquitectura del Soundpad manda
+      // el audio a IndexedDB y no a Firestore. Sin este cerrojo, un cliente
+      // modificado podría meter un MP3 en base64 dentro del documento.
+      return hasOnlyAllowedFields(data, ['name', 'categoryId', 'color', 'icon', 'fileKey', 'fileName', 'fileSize', 'durationMs', 'volume', 'repeat', 'overlay', 'fadeOutMs', 'midiNote', 'trimStartMs', 'trimEndMs', 'favorite', 'order', 'ownerId', 'createdAt', 'updatedAt']) &&
+             hasRequiredFields(data, ['name', 'categoryId', 'fileKey', 'volume', 'repeat', 'overlay', 'favorite', 'ownerId', 'createdAt', 'updatedAt']) &&
+             data.createdAt is timestamp && data.updatedAt is timestamp &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 60 &&
+             data.categoryId is string && data.categoryId.size() > 0 && data.categoryId.size() < 128 &&
+             data.fileKey is string && data.fileKey.size() > 0 && data.fileKey.size() < 200 &&
+             data.volume is number && data.volume >= 0 && data.volume <= 1 &&
+             data.repeat is number && data.repeat >= 0 && data.repeat <= 50 &&
+             data.overlay is bool &&
+             data.favorite is bool &&
+             data.ownerId == request.auth.uid &&
+             (!('fileName' in data) || (data.fileName is string && data.fileName.size() < 200)) &&
+             (!('fileSize' in data) || data.fileSize is number) &&
+             (!('durationMs' in data) || data.durationMs is number) &&
+             (!('fadeOutMs' in data) || (data.fadeOutMs is number && data.fadeOutMs >= 0 && data.fadeOutMs <= 15000)) &&
+             (!('trimStartMs' in data) || (data.trimStartMs is number && data.trimStartMs >= 0)) &&
+             (!('trimEndMs' in data) || (data.trimEndMs is number && data.trimEndMs >= 0)) &&
+             (!('midiNote' in data) || (data.midiNote is number && data.midiNote >= 0 && data.midiNote <= 127)) &&
+             (!('color' in data) || (data.color is string && data.color.size() < 24)) &&
+             (!('icon' in data) || (data.icon is string && data.icon.size() < 24)) &&
+             (!('order' in data) || data.order is number);
+    }
+
+    function isValidSoundCategory(data) {
+      return hasOnlyAllowedFields(data, ['name', 'color', 'order', 'ownerId', 'createdAt']) &&
+             hasRequiredFields(data, ['name', 'color', 'order', 'ownerId', 'createdAt']) &&
+             data.createdAt is timestamp &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 40 &&
+             data.color is string && data.color.size() < 24 &&
+             data.order is number &&
+             data.ownerId == request.auth.uid;
+    }
+
     function isValidContact(data) {
       return hasRequiredFields(data, ['ownerId', 'email', 'lastInteraction']) &&
              data.ownerId == request.auth.uid &&
@@ -264,23 +327,35 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.recipientEmail == request.auth.token.email || resource.data.senderId == request.auth.uid);
     }
 
+    // El Soundpad es personal: sólo su dueño lee y escribe. No se comparte, y el
+    // audio nunca sale del dispositivo.
+    match /soundPads/{padId} {
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidSoundPad(request.resource.data);
+      allow update: if isAuthenticated() &&
+                    resource.data.ownerId == request.auth.uid &&
+                    request.resource.data.ownerId == resource.data.ownerId &&
+                    request.resource.data.createdAt == resource.data.createdAt &&
+                    isValidSoundPad(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /soundCategories/{categoryId} {
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidSoundCategory(request.resource.data);
+      allow update: if isAuthenticated() &&
+                    resource.data.ownerId == request.auth.uid &&
+                    request.resource.data.ownerId == resource.data.ownerId &&
+                    request.resource.data.createdAt == resource.data.createdAt &&
+                    isValidSoundCategory(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+
     match /contacts/{contactId} {
       allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
       allow create: if isAuthenticated() && isValidContact(request.resource.data);
       allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid && isValidContact(request.resource.data);
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
-    }
-
-    // Collection: compositions (Módulo Utilitarios - Compositor de maquetas)
-    // Document ID: compositionId
-    // Owner field: userId (immutable)
-    match /compositions/{compositionId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() &&
-                    resource.data.userId == request.auth.uid &&
-                    request.resource.data.userId == resource.data.userId;
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
   }
 }

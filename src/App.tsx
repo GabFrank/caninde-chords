@@ -16,47 +16,10 @@ import { getLogoUrl, isStandalonePWA } from './lib/utils';
 import { useViewport } from './lib/useViewport';
 import { importOpenSongFile } from './lib/openSongParser';
 import { UtilitariosHub } from './components/UtilitariosHub';
+import { Modal } from './components/Modal';
 import { AuthDiagnostics } from './components/AuthDiagnostics';
 import { describeAuthError, preferredLang } from './lib/authErrors';
 import { recordAttempt, finishAttempt } from './lib/loginAttempt';
-
-// Custom Modal Component
-const Modal: React.FC<{ 
-  isOpen: boolean; 
-  onClose: () => void; 
-  title: string; 
-  children: React.ReactNode;
-}> = ({ isOpen, onClose, title, children }) => {
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-  return (
-    <div data-overlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <motion.div 
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[90dvh]"
-      >
-        <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center shrink-0">
-          <h3 className="text-xl font-bold">{title}</h3>
-          <button onClick={onClose} aria-label="Cerrar" className="min-h-11 min-w-11 inline-flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="p-6 overflow-y-auto">
-          {children}
-        </div>
-      </motion.div>
-    </div>
-  );
-};
 
 declare const __APP_VERSION__: string;
 const APP_VERSION = __APP_VERSION__;
@@ -1024,41 +987,6 @@ export default function App() {
 
   const handleLogout = () => signOut(auth);
 
-  const handleAddSongFromWorkshop = async (songTitle: string, songContent: string) => {
-    if (!user) return;
-    setGlobalLoading('Exportando...');
-    try {
-      const docRef = await addDoc(collection(db, 'songs'), {
-        title: songTitle,
-        artist: 'Composición Caninde',
-        content: songContent,
-        ownerId: user.uid,
-        collaborators: [],
-        editors: [],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-      setActiveTab('songs');
-      setSelectedSong({
-        id: docRef.id,
-        title: songTitle,
-        artist: 'Composición Caninde',
-        content: songContent,
-        ownerId: user.uid,
-        collaborators: [],
-        editors: []
-      } as any);
-      setSelectedSetlist(null);
-      setIsEditing(false);
-      showToast('¡Composición exportada exitosamente!');
-    } catch (e) {
-      console.error('Failed to export composition song to library:', e);
-      showToast('Error al exportar la composición', 'error');
-    } finally {
-      setGlobalLoading(null);
-    }
-  };
-
   const saveSong = async (songData: Partial<Song>) => {
     if (!user) return;
     setGlobalLoading(t.saving || 'Saving...');
@@ -1930,7 +1858,7 @@ export default function App() {
                       <div>
                         <p className="font-extrabold text-sm text-zinc-800 dark:text-zinc-100">{t.utilities}</p>
                         <p className="text-[10px] text-zinc-400 max-w-[150px] leading-relaxed mx-auto mt-1.5">
-                          Herramientas para afinar instrumentos y componer arcos armónicos desde el Yggdrasil.
+                          {t.utilitiesBlurb}
                         </p>
                       </div>
                     </div>
@@ -1952,7 +1880,6 @@ export default function App() {
                   className="h-full flex flex-col overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-4 md:p-6"
                 >
                   <UtilitariosHub
-                    onExportToSong={handleAddSongFromWorkshop}
                     lang={(profile?.language || 'en') as 'es' | 'en'}
                   />
                 </motion.div>

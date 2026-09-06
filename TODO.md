@@ -1,5 +1,25 @@
 # Director Mode Edge Cases & Improvements
 
+## 0. Próximo: Soundpad
+
+Acordado con el usuario, en este orden:
+
+- [x] **Reordenar pads.** Resuelto con un modo "Organizar" aparte, no con un
+  gesto sobre el tablero: arrastrar un pad ya significa "retirá el sonido". Ver
+  gotcha 10 de [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
+- [x] **Atajos de teclado y MIDI.** Teclas 1-9/0 por posición, Escape para el
+  pánico, y nota MIDI por pad con "Aprender". Ver gotcha 11 de
+  [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
+
+Más adelante, sin fecha:
+
+- [ ] **Disparo remoto en Modo Director:** que el director dispare un pad y suene
+  en los dispositivos conectados. La infraestructura de sesiones ya existe; falta
+  resolver que los espectadores tengan los mismos audios (pack `.zip`) y la
+  latencia entre dispositivos.
+- [ ] **Tope de voces por pad:** hoy un pad de overlay tocado veinte veces
+  acumula veinte copias sonando.
+
 ## 0. Future Work: Offline Mode
 - [ ] **Modo Director Offline:** Implementar sincronización P2P utilizando WebRTC para permitir que el director controle a los espectadores en redes locales sin necesidad de internet.
 - [ ] **Heartbeat Robusto:** Mejorar la detección de sesiones activas manejando diferencias de reloj entre dispositivos (lenient skew).
