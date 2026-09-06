@@ -89,3 +89,47 @@ export interface Contact {
   name?: string;
   lastInteraction: any;
 }
+
+// ── Soundpad ──────────────────────────────────────────────────────────────────
+// El catálogo (esto) vive en Firestore y se sincroniza entre dispositivos.
+// El audio en sí NO: los MP3 se guardan en IndexedDB, en cada dispositivo, bajo
+// la clave `fileKey`. Ver `src/services/soundLibrary.ts`.
+
+export interface SoundPad {
+  id: string;
+  ownerId: string;
+  name: string;
+  categoryId: string;
+  /** Color del pad. Clave de SOUNDPAD_COLORS, no una clase de Tailwind. */
+  color?: string;
+  /** Nombre del ícono. Clave de SOUNDPAD_ICONS. */
+  icon?: string;
+  /** Clave del blob en IndexedDB. Vale también entre dispositivos: si falta el
+   *  archivo acá, el pad se muestra como "sin audio" y se puede revincular. */
+  fileKey: string;
+  fileName: string;
+  fileSize: number;
+  durationMs?: number;
+  /** 0 a 1. */
+  volume: number;
+  /** Cuántas veces suena. 1 = una sola; 0 = en bucle hasta pararlo. */
+  repeat: number;
+  /** true: se superpone a lo que esté sonando.
+   *  false: corta todo lo demás antes de empezar. */
+  overlay: boolean;
+  /** Milisegundos de fundido al ser cortado por un pad exclusivo o por pánico. */
+  fadeOutMs?: number;
+  favorite: boolean;
+  order: number;
+  createdAt: any;
+  updatedAt: any;
+}
+
+export interface SoundCategory {
+  id: string;
+  ownerId: string;
+  name: string;
+  color: string;
+  order: number;
+  createdAt: any;
+}

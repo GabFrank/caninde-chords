@@ -47,6 +47,29 @@ service cloud.firestore {
     //
     // ===============================================================
 
+    // Collection: soundPads (Utilitarios - Soundpad de ceremonia)
+    // Document ID: padId
+    // Fields:
+    //   - name: string (required, < 60 chars)
+    //   - categoryId: string (required)
+    //   - fileKey: string (required) — clave del audio en el IndexedDB del
+    //     dispositivo. El MP3 NO se guarda en Firestore ni en Storage.
+    //   - volume: number (required, 0..1)
+    //   - repeat: number (required, 0..50; 0 = bucle)
+    //   - overlay: bool (required)
+    //   - favorite: bool (required)
+    //   - ownerId: string (required, immutable)
+    //
+    // Collection: soundCategories (Utilitarios - Soundpad)
+    // Document ID: categoryId
+    // Fields:
+    //   - name: string (required, < 40 chars)
+    //   - color: string (required)
+    //   - order: number (required)
+    //   - ownerId: string (required, immutable)
+    //
+    // ===============================================================
+
     // ===============================================================
     // Helper Functions
     // ===============================================================
@@ -161,6 +184,33 @@ service cloud.firestore {
              data.senderEmail == request.auth.token.email;
     }
 
+    function isValidSoundPad(data) {
+      return hasRequiredFields(data, ['name', 'categoryId', 'fileKey', 'volume', 'repeat', 'overlay', 'favorite', 'ownerId', 'createdAt', 'updatedAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 60 &&
+             data.categoryId is string && data.categoryId.size() > 0 && data.categoryId.size() < 128 &&
+             data.fileKey is string && data.fileKey.size() > 0 && data.fileKey.size() < 200 &&
+             data.volume is number && data.volume >= 0 && data.volume <= 1 &&
+             data.repeat is number && data.repeat >= 0 && data.repeat <= 50 &&
+             data.overlay is bool &&
+             data.favorite is bool &&
+             data.ownerId == request.auth.uid &&
+             (!('fileName' in data) || (data.fileName is string && data.fileName.size() < 200)) &&
+             (!('fileSize' in data) || data.fileSize is number) &&
+             (!('durationMs' in data) || data.durationMs is number) &&
+             (!('fadeOutMs' in data) || (data.fadeOutMs is number && data.fadeOutMs >= 0 && data.fadeOutMs <= 5000)) &&
+             (!('color' in data) || (data.color is string && data.color.size() < 24)) &&
+             (!('icon' in data) || (data.icon is string && data.icon.size() < 24)) &&
+             (!('order' in data) || data.order is number);
+    }
+
+    function isValidSoundCategory(data) {
+      return hasRequiredFields(data, ['name', 'color', 'order', 'ownerId', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 40 &&
+             data.color is string && data.color.size() < 24 &&
+             data.order is number &&
+             data.ownerId == request.auth.uid;
+    }
+
     function isValidContact(data) {
       return hasRequiredFields(data, ['ownerId', 'email', 'lastInteraction']) &&
              data.ownerId == request.auth.uid &&
@@ -262,6 +312,28 @@ service cloud.firestore {
                       (resource.data.senderId == request.auth.uid && request.resource.data.status == 'rejected')
                     );
       allow delete: if isAuthenticated() && (resource.data.recipientEmail == request.auth.token.email || resource.data.senderId == request.auth.uid);
+    }
+
+    // El Soundpad es personal: sólo su dueño lee y escribe. No se comparte, y el
+    // audio nunca sale del dispositivo.
+    match /soundPads/{padId} {
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidSoundPad(request.resource.data);
+      allow update: if isAuthenticated() &&
+                    resource.data.ownerId == request.auth.uid &&
+                    request.resource.data.ownerId == resource.data.ownerId &&
+                    isValidSoundPad(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /soundCategories/{categoryId} {
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow create: if isAuthenticated() && isValidSoundCategory(request.resource.data);
+      allow update: if isAuthenticated() &&
+                    resource.data.ownerId == request.auth.uid &&
+                    request.resource.data.ownerId == resource.data.ownerId &&
+                    isValidSoundCategory(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
 
     match /contacts/{contactId} {
