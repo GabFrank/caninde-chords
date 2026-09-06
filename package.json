@@ -10,7 +10,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "smoke": "node e2e/smoke.mjs"
+    "smoke": "node e2e/smoke.mjs",
+    "soundpad": "node e2e/soundpad.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
