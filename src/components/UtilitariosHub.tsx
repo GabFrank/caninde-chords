@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Activity, LayoutGrid } from 'lucide-react';
 import { GuitarTuner } from './GuitarTuner';
+import { translations } from '../translations';
 import { SoundpadBoard } from './SoundPad/SoundpadBoard';
 
 interface UtilitariosHubProps {
@@ -14,11 +15,11 @@ type SubTab = 'soundpad' | 'tuner';
 export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ lang = 'es' }) => {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('soundpad');
 
-  const tr = (es: string, en: string) => (lang === 'en' ? en : es);
+  const t = translations[lang];
 
   const tabs: { id: SubTab; label: string; Icon: typeof Activity }[] = [
-    { id: 'soundpad', label: tr('Soundpad', 'Soundpad'), Icon: LayoutGrid },
-    { id: 'tuner', label: tr('Afinador', 'Tuner'), Icon: Activity },
+    { id: 'soundpad', label: t.soundpad, Icon: LayoutGrid },
+    { id: 'tuner', label: t.tuner, Icon: Activity },
   ];
 
   return (

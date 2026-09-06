@@ -202,7 +202,11 @@ export const translations = {
     soundpadDeletePad: 'Delete this sound?',
     soundpadDeleteCategory: 'Delete this category? Its sounds move to Unsorted.',
     soundpadSignIn: 'Sign in to use the Soundpad.',
-    soundpadSearch: 'Search sounds'
+    soundpadSearch: 'Search sounds',
+    soundpadStop: 'Stop this sound',
+    soundpadStopVoice: 'Stop',
+    soundpadIdle: 'Nothing playing',
+    utilitiesBlurb: 'Ceremony sounds and instrument tuner.'
   },
   es: {
     songs: 'Canciones',
@@ -405,6 +409,10 @@ export const translations = {
     soundpadDeletePad: '¿Borrar este sonido?',
     soundpadDeleteCategory: '¿Borrar esta categoría? Sus sonidos pasan a Sin categoría.',
     soundpadSignIn: 'Iniciá sesión para usar el Soundpad.',
-    soundpadSearch: 'Buscar sonidos'
+    soundpadSearch: 'Buscar sonidos',
+    soundpadStop: 'Parar este sonido',
+    soundpadStopVoice: 'Parar',
+    soundpadIdle: 'Nada sonando',
+    utilitiesBlurb: 'Sonidos de la ceremonia y afinador de instrumentos.'
   }
 };

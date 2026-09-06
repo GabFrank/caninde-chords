@@ -5,8 +5,8 @@
 // saber si se superpone y cuántas veces suena, y un anillo de progreso para ver
 // cuánto le queda sin tener que contar.
 
-import React from 'react';
-import { Star, Layers, Scissors, Repeat, Infinity as InfinityIcon, AlertTriangle, Settings2 } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Star, Layers, Scissors, Repeat, Infinity as InfinityIcon, AlertTriangle, Settings2, Square } from 'lucide-react';
 import { SoundPad } from '../../types';
 import { padColor, padIcon } from '../../lib/soundpadStyles';
 import { formatDuration } from '../../services/soundLibrary';
@@ -17,10 +17,15 @@ interface SoundPadButtonProps {
   /** 0 a 1; `null` cuando está en bucle indefinido o en reposo. */
   progress: number | null;
   missing: boolean;
-  onTrigger: (pad: SoundPad) => void;
+  /** Devuelve el id de la voz, para poder retirarla si el gesto era un scroll. */
+  onTrigger: (pad: SoundPad) => Promise<string | null> | void;
   onStop: (pad: SoundPad) => void;
+  /** Corta un disparo accidental sin que llegue a oírse. */
+  onRetract: (voiceId: string) => void;
   onEdit: (pad: SoundPad) => void;
   onToggleFavorite: (pad: SoundPad) => void;
+  /** Pantalla de poco alto (teléfono apaisado): pad más bajo, sin insignias. */
+  dense?: boolean;
   labels: {
     favorite: string;
     edit: string;
@@ -28,43 +33,105 @@ interface SoundPadButtonProps {
     overlayOn: string;
     overlayOff: string;
     loop: string;
+    stop: string;
   };
 }
 
+/** Cuánto puede moverse el dedo antes de que el gesto deje de ser un toque. */
+const DRAG_PX = 10;
+
 export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
-  pad, playing, progress, missing, onTrigger, onStop, onEdit, onToggleFavorite, labels,
+  pad, playing, progress, missing, onTrigger, onStop, onRetract, onEdit, onToggleFavorite, labels, dense = false,
 }) => {
   const color = padColor(pad.color);
   const Icon = padIcon(pad.icon);
   const loop = pad.repeat === 0;
 
-  // Se dispara en pointerdown, no en click: en táctil el click llega recién al
-  // levantar el dedo y ese retraso se nota cuando el sonido tiene que caer justo.
+  /** Disparo en curso: dónde empezó el dedo y qué voz nació de él. */
+  const gesture = useRef<{ x: number; y: number; voiceId: string | null; retracted: boolean } | null>(null);
+
+  /**
+   * Se dispara en `pointerdown`, no en `click`: en táctil el click llega recién
+   * al levantar el dedo y ese retraso se nota cuando el sonido tiene que caer
+   * justo.
+   *
+   * El precio de eso es que un desplazamiento por la grilla empieza igual que un
+   * toque, y disparaba un trueno cada vez que el operador buscaba un sonido. Por
+   * eso el disparo se RETIRA en cuanto el gesto se revela como arrastre: si el
+   * dedo se mueve más de DRAG_PX, o el navegador se queda con el gesto para
+   * desplazar (`pointercancel`), la voz se corta de inmediato y no llega a oírse.
+   */
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (playing && loop) { onStop(pad); return; }
+
+    gesture.current = { x: e.clientX, y: e.clientY, voiceId: null, retracted: false };
+    const started = gesture.current;
+    Promise.resolve(onTrigger(pad)).then(voiceId => {
+      if (!voiceId) return;
+      // El gesto pudo revelarse como arrastre mientras se decodificaba.
+      if (started.retracted) onRetract(voiceId);
+      else started.voiceId = voiceId;
+    });
+  };
+
+  const cancelIfDragging = (e: React.PointerEvent) => {
+    const g = gesture.current;
+    if (!g || g.retracted) return;
+    if (Math.hypot(e.clientX - g.x, e.clientY - g.y) < DRAG_PX) return;
+    g.retracted = true;
+    if (g.voiceId) onRetract(g.voiceId);
+  };
+
+  const handlePointerCancel = () => {
+    const g = gesture.current;
+    if (!g || g.retracted) return;
+    g.retracted = true;
+    if (g.voiceId) onRetract(g.voiceId);
+  };
+
+  const endGesture = () => { gesture.current = null; };
+
+  /**
+   * Enter y Espacio producen un `click` sintético, nunca un `pointerdown`: sin
+   * esto los pads eran inalcanzables con teclado, pedal Bluetooth o lector de
+   * pantalla. `detail === 0` distingue ese click del que acompaña a un toque ya
+   * atendido más arriba.
+   */
+  const handleClick = (e: React.MouseEvent) => {
+    if (e.detail !== 0) return;
     if (playing && loop) onStop(pad);
     else onTrigger(pad);
   };
 
   return (
     <div className="relative">
+      {/* `touchAction: 'pan-y'` deja que el navegador se quede con el
+          desplazamiento vertical, que es justo lo que emite el `pointercancel`
+          con el que se retira el sonido. Con `none` la grilla no se podría
+          desplazar; con `manipulation` el navegador no avisaría del arrastre. */}
       <button
         type="button"
         onPointerDown={handlePointerDown}
+        onPointerMove={cancelIfDragging}
+        onPointerCancel={handlePointerCancel}
+        onPointerUp={endGesture}
+        onPointerLeave={handlePointerCancel}
+        onClick={handleClick}
         onContextMenu={(e) => { e.preventDefault(); onEdit(pad); }}
         data-pad-id={pad.id}
         data-playing={playing ? 'true' : 'false'}
         aria-label={`${pad.name}${missing ? ` — ${labels.missing}` : ''}`}
         aria-pressed={playing}
-        className={`w-full min-h-[88px] p-2.5 rounded-2xl border-2 flex flex-col items-center justify-center gap-1.5 text-center transition-colors select-none touch-manipulation active:scale-[0.97] ${playing ? color.active : color.surface} ${missing ? 'opacity-60 border-dashed' : ''}`}
-        style={{ touchAction: 'manipulation' }}
+        className={`w-full ${dense ? 'min-h-[62px] pt-5 px-1.5 pb-1.5' : 'min-h-[88px] pt-6 px-2 pb-2.5'} rounded-2xl border-2 flex flex-col items-center justify-center gap-1 text-center transition-colors select-none active:scale-[0.97] ${playing ? color.active : color.surface} ${missing ? 'opacity-60 border-dashed' : ''}`}
+        style={{ touchAction: 'pan-y' }}
       >
-        <Icon size={22} className="shrink-0" />
+        <Icon size={dense ? 16 : 22} className="shrink-0" />
         <span className="text-[11px] font-black leading-tight line-clamp-2 break-words w-full">
           {pad.name}
         </span>
 
-        <div className="flex items-center gap-1 text-[9px] font-bold opacity-70">
+        <div className={`items-center gap-1 text-[9px] font-bold opacity-70 ${dense ? 'hidden' : 'flex'}`}>
           {missing ? (
             <AlertTriangle size={10} />
           ) : (
@@ -95,23 +162,30 @@ export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
         )}
       </button>
 
-      {/* Favorito y ajustes, fuera del área de disparo para no dispararlo sin querer. */}
+      {/* Favorito y ajustes van DENTRO de las esquinas del pad, no sobresaliendo:
+          con 10px de canalón, dos controles que sobresalen 8px se solapan con los
+          del pad vecino y el operador marca un favorito cuando quería disparar.
+          Miden 36px, que es el área táctil mínima razonable. */}
       <button
         type="button"
         onClick={() => onToggleFavorite(pad)}
         aria-label={labels.favorite}
         aria-pressed={pad.favorite}
-        className="absolute -top-1.5 -left-1.5 h-7 w-7 rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-sm flex items-center justify-center"
+        className="absolute top-0.5 left-0.5 h-9 w-9 rounded-full flex items-center justify-center"
       >
-        <Star size={12} className={pad.favorite ? 'fill-amber-400 text-amber-400' : 'text-zinc-400'} />
+        <Star size={13} className={pad.favorite ? 'fill-amber-400 text-amber-400' : 'text-current opacity-45'} />
       </button>
+      {/* Mientras suena, el mismo sitio es "parar este sonido": un ambiente largo
+          de una sola pasada no se puede cortar volviendo a tocar el pad (se
+          superpondría consigo mismo si es de overlay), y buscar su ficha en la
+          franja de arriba es demasiado lento en vivo. Editar puede esperar. */}
       <button
         type="button"
-        onClick={() => onEdit(pad)}
-        aria-label={labels.edit}
-        className="absolute -top-1.5 -right-1.5 h-7 w-7 rounded-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-sm flex items-center justify-center text-zinc-400 hover:text-blue-600"
+        onClick={() => (playing ? onStop(pad) : onEdit(pad))}
+        aria-label={playing ? labels.stop : labels.edit}
+        className={`absolute top-0.5 right-0.5 h-9 w-9 rounded-full flex items-center justify-center ${playing ? 'text-red-100' : 'text-current opacity-45 hover:opacity-100'}`}
       >
-        <Settings2 size={12} />
+        {playing ? <Square size={13} className="fill-current" /> : <Settings2 size={13} />}
       </button>
     </div>
   );

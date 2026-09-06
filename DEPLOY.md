@@ -117,7 +117,7 @@ con `getFirestore(app, firebaseConfig.firestoreDatabaseId)`.
 
 Colecciones: `users`, `songs`, `setlists`, `sessions` (+ subcolecciones
 `participants` y `signaling`), `userSongSettings`, `shares`, `contacts`,
-`compositions`. El esquema está descrito en `firebase-blueprint.json` y las
+`soundPads` y `soundCategories`. El esquema está descrito en `firebase-blueprint.json` y las
 reglas en `firestore.rules`.
 
 El cliente habilita persistencia offline con IndexedDB.

@@ -51,7 +51,18 @@ con Google, en **[AUTH.md](AUTH.md)**.
 - **Escrituras optimistas:** las llamadas a Firestore del Soundpad NO se esperan.
   Con persistencia offline el cambio se aplica a la caché local al instante, pero
   la promesa sólo resuelve cuando confirma el servidor; esperarla cuelga la
-  interfaz justo en el lugar de la ceremonia, con mala conexión.
+  interfaz justo en el lugar de la ceremonia, con mala conexión. Consecuencia
+  obligatoria: el audio se escribe ANTES de que exista su ficha, así que toda
+  clave recién escrita va PROTEGIDA de `pruneOrphans` (`ownKeys` en
+  `useSoundpad.ts`) o se borra sola.
+- **Disparo táctil:** el pad dispara en `pointerdown` para no tener latencia, y
+  RETIRA el sonido si el gesto se revela como arrastre (`pointermove` > 10px o
+  `pointercancel`). Sin eso, desplazarse por la grilla disparaba un trueno. El
+  `touch-action` del pad debe ser `pan-y`: con `none` la grilla no se desplaza y
+  con `manipulation` el navegador no avisa del arrastre.
+- **Nada puede empujar la grilla.** La franja "Sonando" ocupa un alto fijo aunque
+  no haya nada sonando, y los avisos van debajo del tablero: un salto de 70px con
+  pads de 88px hace que el operador toque el pad equivocado justo al disparar.
 
 ## 🛠 Reglas Técnicas Obligatorias
 

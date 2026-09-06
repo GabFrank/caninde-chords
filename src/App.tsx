@@ -1858,7 +1858,7 @@ export default function App() {
                       <div>
                         <p className="font-extrabold text-sm text-zinc-800 dark:text-zinc-100">{t.utilities}</p>
                         <p className="text-[10px] text-zinc-400 max-w-[150px] leading-relaxed mx-auto mt-1.5">
-                          Sonidos de la ceremonia y afinador de instrumentos.
+                          {t.utilitiesBlurb}
                         </p>
                       </div>
                     </div>

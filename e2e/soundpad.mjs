@@ -89,6 +89,13 @@ await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForSelector('[data-mode]', { timeout: 20000 });
 await page.waitForTimeout(600);
 
+// Se cuentan las fichas de voz, no el texto de la pantalla: el hueco que la
+// franja "Sonando" reserva siempre lleva la leyenda "Nada sonando", que contiene
+// la misma palabra y haría pasar la comprobación con el tablero mudo.
+const fichasDeVoz = () => page.evaluate(() => document.querySelectorAll('[data-voice-id]').length);
+const countPlaying = () => page.evaluate(() =>
+  document.querySelectorAll('[data-pad-id][data-playing="true"]').length);
+
 const results = [];
 const check = (name, ok, extra = '') => { results.push(`${ok ? '✓' : '✗'} ${name}${extra ? ' — ' + extra : ''}`); if (!ok) process.exitCode = 1; };
 
@@ -98,7 +105,15 @@ await page.waitForTimeout(400);
 check('la pestaña Utilitarios abre el Soundpad', await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).count() > 0);
 check('el Yggdrasil ya no está', await page.getByText(/Yggdrasil/).count() === 0);
 check('el Manual de Conexiones ya no está', await page.getByText(/Manual de Conexiones|Connections Manual/).count() === 0);
-check('el Afinador sigue disponible', await page.getByRole('button', { name: /^(Afinador|Tuner)$/ }).count() > 0);
+// Se ENTRA al Afinador, no se comprueba que exista su botón: el riesgo real de
+// haber adelgazado `audioEngine` es que el afinador reviente al montarse, y eso
+// una comprobación sobre la pestaña no lo vería.
+await page.getByRole('button', { name: /^(Afinador|Tuner)$/ }).click();
+await page.waitForTimeout(600);
+check('el Afinador monta y funciona',
+  await page.getByText(/Encender Micrófono|Enable Microphone|EADGBE/i).count() > 0);
+await page.getByRole('button', { name: /^Soundpad$/ }).click();
+await page.waitForTimeout(400);
 
 // Alta de un sonido
 await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
@@ -117,8 +132,7 @@ if (padVisible) {
   // Disparar
   await page.getByRole('button', { name: /Trueno lejano/ }).first().dispatchEvent('pointerdown');
   await page.waitForTimeout(400);
-  const playing = await page.evaluate(() => !!document.body.innerText.match(/SONANDO|PLAYING/i));
-  check('al tocar el pad aparece en "Sonando"', playing);
+  check('al tocar el pad aparece una ficha en "Sonando"', await fichasDeVoz() === 1);
 
   const activos = await page.evaluate(() =>
     document.querySelectorAll('[data-pad-id][data-playing="true"]').length);
@@ -127,7 +141,7 @@ if (padVisible) {
   // Pánico
   await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
   await page.waitForTimeout(600);
-  check('el pánico deja de mostrar voces', !(await page.evaluate(() => !!document.body.innerText.match(/SONANDO|PLAYING/i))));
+  check('el pánico deja de mostrar voces', await fichasDeVoz() === 0);
 
   // Persistencia del audio en IndexedDB
   const stored = await page.evaluate(() => new Promise(res => {
@@ -162,9 +176,6 @@ async function addPad(name, { overlay, loop }) {
   await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
   await page.waitForTimeout(900);
 }
-
-const countPlaying = () => page.evaluate(() =>
-  document.querySelectorAll('[data-pad-id][data-playing="true"]').length);
 
 await page.getByRole('button', { name: /^(Todos|All) / }).first().click();
 await addPad('Lluvia', { overlay: true, loop: true });
@@ -235,6 +246,68 @@ await page.waitForTimeout(500);
 check('un pad restaurado desde el pack vuelve a sonar', await countPlaying() === 1);
 await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
 rmSync(packPath, { force: true });
+
+// ── Regresiones de las auditorías ───────────────────────────────────────────
+
+// (a) Desplazarse por la grilla no debe disparar sonidos.
+// El pad dispara en `pointerdown` para no tener latencia; el precio es que un
+// arrastre empieza igual que un toque. El disparo se retira en cuanto el gesto
+// se revela como arrastre, y eso es lo que se comprueba acá.
+await page.getByRole('button', { name: /^(Todos|All) / }).first().click();
+await page.waitForTimeout(300);
+const caja = await page.locator('[data-pad-id]').first().boundingBox();
+await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
+await page.mouse.down();
+for (let i = 1; i <= 5; i++) await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2 - i * 12);
+await page.mouse.up();
+await page.waitForTimeout(500);
+check('desplazarse sobre un pad no deja ningún sonido', await countPlaying() === 0, `activos: ${await countPlaying()}`);
+
+// (b) La grilla no puede moverse cuando empieza a sonar el primer pad.
+const yAntes = (await page.locator('[data-pad-id]').first().boundingBox()).y;
+await page.locator('[data-pad-id]').first().dispatchEvent('pointerdown');
+await page.waitForTimeout(400);
+const yDurante = (await page.locator('[data-pad-id]').first().boundingBox()).y;
+check('la grilla no se mueve al empezar a sonar', Math.abs(yDurante - yAntes) < 2,
+  `se movió ${Math.round(yDurante - yAntes)}px`);
+await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
+await page.waitForTimeout(400);
+
+// (c) Los pads tienen que responder al teclado (pedal, teclado numérico, lector).
+await page.locator('[data-pad-id]').first().focus();
+await page.keyboard.press('Enter');
+await page.waitForTimeout(500);
+check('un pad se dispara con el teclado', await countPlaying() === 1, `activos: ${await countPlaying()}`);
+await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
+await page.waitForTimeout(400);
+
+// (d) Un bucle no puede quedar sonando fuera del control de la interfaz.
+// El motor sobrevive al desmontaje del tablero: al volver de otra pestaña, la
+// interfaz tiene que seguir viendo la voz y poder cortarla.
+await page.getByRole('button', { name: /^Lluvia/ }).first().dispatchEvent('pointerdown');
+await page.waitForTimeout(400);
+await page.getByRole('button', { name: /^(Afinador|Tuner)$/ }).click();
+await page.waitForTimeout(600);
+await page.getByRole('button', { name: /^Soundpad$/ }).click();
+await page.waitForTimeout(700);
+check('al volver de otra pestaña, el bucle sigue bajo control', await fichasDeVoz() === 1, `fichas: ${await fichasDeVoz()}`);
+check('y el botón de pánico está habilitado',
+  !(await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).isDisabled()));
+await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
+await page.waitForTimeout(500);
+check('el pánico lo corta', await fichasDeVoz() === 0);
+
+// (e) En teléfono, los botones de sólo ícono tienen que tener nombre.
+await page.setViewportSize({ width: 390, height: 844 });
+await page.waitForTimeout(500);
+const sinNombre = await page.evaluate(() => {
+  const visible = (el) => el.getBoundingClientRect().width > 0;
+  return [...document.querySelectorAll('button')].filter(b =>
+    visible(b) && !b.getAttribute('aria-label') && !b.textContent.trim()).length;
+});
+check('ningún botón visible queda sin nombre a 390px', sinNombre === 0, `sin nombre: ${sinNombre}`);
+check('no hay desbordamiento horizontal a 390px',
+  await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
 check('sin errores de JavaScript', errs.length === 0, errs.join(' | '));
 

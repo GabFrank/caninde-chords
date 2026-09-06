@@ -10,6 +10,7 @@ import {
   Download, Upload,
 } from 'lucide-react';
 import { useAuth } from '../AuthProvider';
+import { useViewport } from '../../lib/useViewport';
 import { SoundPad } from '../../types';
 import { translations } from '../../translations';
 import { formatBytes } from '../../services/soundLibrary';
@@ -30,12 +31,17 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
   const { user } = useAuth();
   const t = translations[lang] as unknown as Record<string, string>;
   const sp = useSoundpad();
+  // En teléfono apaisado la cabecera de la app, las dos barras, los chips y el
+  // buscador se comían los 390px de alto y no quedaba ni una fila de pads
+  // legible. Con poco alto la pantalla se compacta y el buscador se despliega.
+  const { isShort } = useViewport();
 
   const [filter, setFilter] = useState<string>(ALL);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<{ open: boolean; pad: SoundPad | null }>({ open: false, pad: null });
   const [showCategories, setShowCategories] = useState(false);
   const [clock, setClock] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [packBusy, setPackBusy] = useState<'export' | 'import' | null>(null);
   const [packNote, setPackNote] = useState<string | null>(null);
   const packInput = useRef<HTMLInputElement>(null);
@@ -57,18 +63,23 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
     let cancelled = false;
     const request = async () => {
       const nav = navigator as Navigator & { wakeLock?: { request: (t: string) => Promise<any> } };
-      if (!nav.wakeLock) return;
+      if (!nav.wakeLock || wakeLockRef.current) return;
       try {
         const lock = await nav.wakeLock.request('screen');
         if (cancelled) { lock.release?.(); return; }
         wakeLockRef.current = lock;
+        // El navegador suelta el bloqueo por su cuenta al ocultarse la pestaña.
+        // Sin enterarnos, la referencia quedaba apuntando a un centinela muerto
+        // y el guardián de más abajo impedía volver a pedirlo: la pantalla se
+        // apagaba sola a partir de la primera vez que el operador salía.
+        lock.addEventListener?.('release', () => { wakeLockRef.current = null; });
       } catch {
         // El navegador puede negarlo (batería baja, pestaña oculta): no es grave.
       }
     };
     request();
     // El bloqueo se pierde al ocultar la pestaña; hay que volver a pedirlo.
-    const onVisible = () => { if (document.visibilityState === 'visible' && !wakeLockRef.current) request(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') request(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       cancelled = true;
@@ -177,7 +188,7 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
             value={sp.masterVolume}
             aria-label={t.soundpadMaster}
             onChange={(e) => sp.setMasterVolume(Number(e.target.value))}
-            className="w-full accent-blue-600"
+            className="w-full h-11 accent-blue-600 cursor-pointer"
           />
           <span className="text-[10px] font-bold text-zinc-400 w-8 text-right tabular-nums">
             {Math.round(sp.masterVolume * 100)}
@@ -188,7 +199,8 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
           <button
             type="button"
             onClick={() => setShowCategories(true)}
-            className="min-h-11 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs font-bold flex items-center gap-1.5"
+            aria-label={t.soundpadCategories}
+            className="min-h-11 min-w-11 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs font-bold flex items-center justify-center gap-1.5"
           >
             <Tags size={14} />
             <span className="hidden sm:inline">{t.soundpadCategories}</span>
@@ -196,7 +208,8 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
           <button
             type="button"
             onClick={() => setEditing({ open: true, pad: null })}
-            className="min-h-11 px-3 rounded-xl bg-blue-600 text-white text-xs font-black flex items-center gap-1.5"
+            aria-label={t.soundpadAdd}
+            className="min-h-11 min-w-11 px-3 rounded-xl bg-blue-600 text-white text-xs font-black flex items-center justify-center gap-1.5"
           >
             <Plus size={14} />
             <span className="hidden sm:inline">{t.soundpadAdd}</span>
@@ -204,25 +217,35 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
         </div>
       </div>
 
-      {/* Qué está sonando ahora. */}
-      {sp.voices.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
-          <span className="text-[10px] font-black text-blue-600 uppercase self-center px-1">
-            {t.soundpadPlaying}
-          </span>
-          {sp.voices.map(voice => (
-            <button
-              key={voice.voiceId}
-              type="button"
-              onClick={() => sp.stopVoice(voice.voiceId)}
-              className="min-h-9 pl-2.5 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-blue-200 dark:border-blue-900 text-[11px] font-bold flex items-center gap-1.5"
-            >
-              {voice.padName}
-              <X size={12} className="text-zinc-400" />
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Qué está sonando ahora.
+          El contenedor está SIEMPRE presente y con alto fijo. Insertarlo sólo
+          cuando algo suena empujaba la grilla 70px hacia abajo justo al disparar
+          el primer pad: el operador apuntaba a la segunda fila y, para cuando
+          bajaba el dedo, ese punto ya lo ocupaba la primera. */}
+      <div className="h-14 flex items-center shrink-0">
+        {sp.voices.length > 0 ? (
+          <div className="w-full h-full flex items-center gap-1.5 px-2 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 overflow-x-auto touch-scrolling">
+            <span className="text-[10px] font-black text-blue-600 uppercase px-1 shrink-0">
+              {t.soundpadPlaying}
+            </span>
+            {sp.voices.map(voice => (
+              <button
+                key={voice.voiceId}
+                type="button"
+                onClick={() => sp.stopVoice(voice.voiceId)}
+                data-voice-id={voice.voiceId}
+                aria-label={`${t.soundpadStopVoice}: ${voice.padName}`}
+                className="shrink-0 min-h-9 pl-2.5 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-blue-200 dark:border-blue-900 text-[11px] font-bold flex items-center gap-1.5"
+              >
+                {voice.padName}
+                <X size={12} className="text-zinc-400" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[10px] text-zinc-400 px-1">{t.soundpadIdle}</p>
+        )}
+      </div>
 
       {/* Filtros y búsqueda. */}
       <div className="space-y-2">
@@ -233,7 +256,7 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
               type="button"
               onClick={() => setFilter(chip.id)}
               aria-pressed={filter === chip.id}
-              className={`shrink-0 min-h-9 px-3 rounded-full text-[11px] font-bold flex items-center gap-1.5 transition-colors ${filter === chip.id ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'}`}
+              className={`shrink-0 min-h-9 px-3 rounded-full text-[11px] font-bold flex items-center gap-1.5 transition-colors ${filter === chip.id ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'}`}
             >
               {chip.id === FAVORITES
                 ? <Star size={11} className={filter === chip.id ? 'fill-current' : ''} />
@@ -244,31 +267,30 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
           ))}
         </div>
 
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t.soundpadSearch}
+        {(!isShort || searchOpen || search) ? (
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              value={search}
+              autoFocus={searchOpen}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t.soundpadSearch}
+              aria-label={t.soundpadSearch}
+              className="w-full min-h-11 pl-9 pr-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-blue-500 outline-none text-sm"
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
             aria-label={t.soundpadSearch}
-            className="w-full min-h-11 pl-9 pr-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-blue-500 outline-none text-sm"
-          />
-        </div>
+            className="min-h-9 px-3 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold text-zinc-500 flex items-center gap-1.5"
+          >
+            <Search size={12} />
+            {t.soundpadSearch}
+          </button>
+        )}
       </div>
-
-      {sp.error && (
-        <p className="text-xs text-red-600 font-bold flex items-start gap-1.5" role="alert">
-          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-          <span className="break-words min-w-0">{sp.error}</span>
-        </p>
-      )}
-
-      {sp.missingIds.size > 0 && (
-        <p className="text-[11px] text-amber-700 dark:text-amber-500 leading-relaxed flex items-start gap-1.5 p-2 rounded-xl bg-amber-50 dark:bg-amber-950/30">
-          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-          <span>{t.soundpadMissingHelp}</span>
-        </p>
-      )}
 
       {/* El tablero. */}
       {sp.loading ? (
@@ -290,7 +312,7 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2.5 pt-1.5">
+        <div className={`grid gap-2.5 pt-1.5 ${isShort ? 'grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10' : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8'}`}>
           {visiblePads.map(pad => (
             <SoundPadButton
               key={pad.id}
@@ -300,6 +322,8 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
               missing={sp.missingIds.has(pad.id)}
               onTrigger={sp.playPad}
               onStop={(p) => sp.stopPad(p.id)}
+              onRetract={sp.retract}
+              dense={isShort}
               onEdit={(p) => setEditing({ open: true, pad: p })}
               onToggleFavorite={sp.toggleFavorite}
               labels={{
@@ -309,10 +333,25 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
                 overlayOn: t.soundpadOverlayOn,
                 overlayOff: t.soundpadOverlayOff,
                 loop: t.soundpadRepeatLoop,
+                stop: t.soundpadStop,
               }}
             />
           ))}
         </div>
+      )}
+
+      {sp.error && (
+        <p className="text-xs text-red-600 font-bold flex items-start gap-1.5" role="alert">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          <span className="break-words min-w-0">{sp.error}</span>
+        </p>
+      )}
+
+      {sp.missingIds.size > 0 && (
+        <p className="text-[11px] text-amber-700 dark:text-amber-500 leading-relaxed flex items-start gap-1.5 p-2 rounded-xl bg-amber-50 dark:bg-amber-950/30">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          <span>{t.soundpadMissingHelp}</span>
+        </p>
       )}
 
       {/* Pie: pack y espacio ocupado. Los audios viven en este dispositivo, así

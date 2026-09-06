@@ -1,7 +1,7 @@
 // ABM de categorías. Borrar una categoría no borra sus sonidos: pasan a
 // "sin categoría", que es lo que uno espera cuando reorganiza el tablero.
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Check, X } from 'lucide-react';
 import { Modal } from '../Modal';
 import { SoundCategory } from '../../types';
@@ -28,6 +28,17 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
   const [editingName, setEditingName] = useState('');
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Al cerrar se olvida todo, sobre todo el "borrar" ya armado: si el operador
+  // toca la papelera, se arrepiente y cierra con la X, al volver a abrir el
+  // botón rojo seguía apuntando a esa categoría y un toque de más la borraba.
+  useEffect(() => {
+    if (open) return;
+    setNewName('');
+    setEditingId(null);
+    setEditingName('');
+    setConfirmId(null);
+  }, [open]);
 
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
