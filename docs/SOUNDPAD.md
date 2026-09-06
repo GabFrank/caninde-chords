@@ -48,6 +48,8 @@ arregla revinculando el archivo o importando el pack `.zip`.
 | `src/components/SoundPad/SoundPadButton.tsx` | El pad |
 | `src/components/SoundPad/SoundPadEditor.tsx` | Alta y edición |
 | `src/components/SoundPad/CategoryManager.tsx` | ABM de categorías |
+| `src/components/SoundPad/PadArranger.tsx` | Modo organizar: reordenar los pads |
+| `src/lib/padOrder.ts` | Reparto de los valores de `order` al reordenar |
 
 Las interfaces `SoundPad` y `SoundCategory` están en `src/types.ts`; las reglas
 de acceso, en `firestore.rules`.
@@ -142,7 +144,23 @@ El `.zip` lo trae el usuario. Sus campos se sanean uno por uno
 texto hacía que las reglas rechazaran la creación y el usuario sólo veía un
 "importado" que no importó nada.
 
-### 10. iOS suspende el audio con la pantalla bloqueada
+### 10. Reordenar es un modo aparte, no un gesto sobre el tablero
+
+Arrastrar un pad ya significa "esto era un desplazamiento, retirá el sonido"
+(gotcha 5). Reordenar con ese mismo gesto sería ambiguo, y en plena ceremonia
+mover un pad sin querer es peor que no poder moverlo.
+
+Por eso hay un botón **Organizar** que cambia a una lista donde los pads no
+suenan (`PadArranger.tsx`), con asa de arrastre y botones ↑/↓ — el patrón que ya
+usa `SetlistEditor`, porque en táctil y con teclado las flechas son lo único
+fiable. El conjunto se congela mientras se organiza: los filtros se ocultan.
+
+Al guardar se reparten **sólo los valores de `order` que esos pads ya ocupaban**
+(`reassignOrder` en `src/lib/padOrder.ts`), no una renumeración de 0 a n. Así,
+acomodar los sonidos de una categoría no mueve a los de las demás, que es lo que
+uno espera cuando filtró antes de ordenar.
+
+### 11. iOS suspende el audio con la pantalla bloqueada
 
 En PWA instalada, iOS suspende el `AudioContext` al bloquear la pantalla o pasar
 a segundo plano. Mitigación: Screen Wake Lock mientras el tablero está abierto, y
@@ -165,7 +183,8 @@ npm run build && npm run soundpad
 caída a propósito**: disparo, overlay vs exclusivo, pánico, persistencia en
 IndexedDB, ida y vuelta del pack, y las regresiones de las auditorías
 (desplazarse no dispara, la grilla no se mueve, el teclado funciona, el bucle
-sigue bajo control al volver de otra pestaña).
+sigue bajo control al volver de otra pestaña) y el modo organizar, incluido que
+el orden nuevo sobreviva a recargar la página.
 
 Las pruebas del motor están escritas para fallar si el código se rompe: se
 verificó saboteando el overlay, las repeticiones, la deduplicación de

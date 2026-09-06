@@ -6,7 +6,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  addDoc, collection, deleteDoc, deleteField, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where,
+  addDoc, collection, deleteDoc, deleteField, doc, onSnapshot, query, serverTimestamp, setDoc,
+  updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { useAuth } from '../AuthProvider';
@@ -17,6 +18,7 @@ import {
 import { ActiveVoice, MissingAudioError, soundpadEngine } from '../../services/soundpadEngine';
 import { exportPack, importPack, packFileName } from '../../services/soundpadPack';
 import { DEFAULT_COLOR_ID, DEFAULT_ICON_ID, UNCATEGORIZED_ID } from '../../lib/soundpadStyles';
+import { reassignOrder } from '../../lib/padOrder';
 
 export type PadDraft = Omit<SoundPad, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'>;
 
@@ -286,6 +288,23 @@ export function useSoundpad() {
       .catch(e => reportFirestore(e, OperationType.DELETE, `soundCategories/${category.id}`, setError));
   }, [pads]);
 
+  /** Guarda un orden nuevo para los pads que se estaban organizando. */
+  const reorderPads = useCallback(async (orderedIds: string[]) => {
+    if (!user) return;
+    const cambios = reassignOrder(pads, orderedIds);
+    if (cambios.length === 0) return;
+
+    // Un `writeBatch` para que sea una sola ida al servidor y para que no pueda
+    // quedar la mitad del tablero reordenado.
+    const batch = writeBatch(db);
+    cambios.forEach(({ id, order }) => {
+      batch.update(doc(db, 'soundPads', id), { order, updatedAt: serverTimestamp() });
+    });
+    // El lote se aplica a la caché local al instante; la promesa espera al
+    // servidor, así que no se espera, igual que el resto de las escrituras.
+    batch.commit().catch(e => reportFirestore(e, OperationType.WRITE, 'soundPads', setError));
+  }, [user, pads]);
+
   // ── Acciones sobre el motor ────────────────────────────────────────────────
 
   /** Dispara un pad. Devuelve el id de la voz, o `null` si no llegó a sonar. */
@@ -400,7 +419,7 @@ export function useSoundpad() {
   return {
     ...state,
     createPad, updatePad, deletePad, toggleFavorite,
-    createCategory, updateCategory, deleteCategory,
+    createCategory, updateCategory, deleteCategory, reorderPads,
     playPad,
     stopPad, stopVoice, stopAll, retract, clock,
     setMasterVolume, refreshUsage, setError,

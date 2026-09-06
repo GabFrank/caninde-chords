@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Search, Square, Star, Tags, Volume2, HardDrive, AlertTriangle, X,
-  Download, Upload,
+  Download, Upload, ArrowUpDown,
 } from 'lucide-react';
 import { useAuth } from '../AuthProvider';
 import { useViewport } from '../../lib/useViewport';
@@ -19,6 +19,7 @@ import { useSoundpad } from './useSoundpad';
 import { SoundPadButton } from './SoundPadButton';
 import { SoundPadEditor } from './SoundPadEditor';
 import { CategoryManager } from './CategoryManager';
+import { PadArranger } from './PadArranger';
 
 interface SoundpadBoardProps {
   lang?: 'es' | 'en';
@@ -40,6 +41,7 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<{ open: boolean; pad: SoundPad | null }>({ open: false, pad: null });
   const [showCategories, setShowCategories] = useState(false);
+  const [arranging, setArranging] = useState(false);
   const [clock, setClock] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [packBusy, setPackBusy] = useState<'export' | 'import' | null>(null);
@@ -199,6 +201,17 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
         <div className="flex items-center gap-1.5 ml-auto">
           <button
             type="button"
+            onClick={() => setArranging(true)}
+            disabled={visiblePads.length < 2}
+            aria-label={t.soundpadArrange}
+            title={visiblePads.length < 2 ? t.soundpadArrangeEmpty : undefined}
+            className="min-h-11 min-w-11 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-40"
+          >
+            <ArrowUpDown size={14} />
+            <span className="hidden sm:inline">{t.soundpadArrange}</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setShowCategories(true)}
             aria-label={t.soundpadCategories}
             className="min-h-11 min-w-11 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs font-bold flex items-center justify-center gap-1.5"
@@ -248,8 +261,9 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
         )}
       </div>
 
-      {/* Filtros y búsqueda. */}
-      <div className="space-y-2">
+      {/* Filtros y búsqueda. Se ocultan mientras se organiza: cambiar el filtro
+          a mitad de un reordenamiento cambia el conjunto bajo los pies. */}
+      <div className={`space-y-2 ${arranging ? 'hidden' : ''}`}>
         <div className="flex gap-1.5 overflow-x-auto touch-scrolling pb-1">
           {chips.map(chip => (
             <button
@@ -293,8 +307,15 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
         )}
       </div>
 
-      {/* El tablero. */}
-      {sp.loading ? (
+      {/* El tablero, o el organizador mientras se acomoda el orden. */}
+      {arranging ? (
+        <PadArranger
+          pads={visiblePads}
+          onSave={sp.reorderPads}
+          onCancel={() => setArranging(false)}
+          t={t}
+        />
+      ) : sp.loading ? (
         <div className="py-12 text-center text-xs text-zinc-400">…</div>
       ) : visiblePads.length === 0 ? (
         <div className="py-12 text-center space-y-3">

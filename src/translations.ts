@@ -209,6 +209,10 @@ export const translations = {
     soundpadStop: 'Stop this sound',
     soundpadStopVoice: 'Stop',
     soundpadIdle: 'Nothing playing',
+    soundpadArrange: 'Arrange',
+    soundpadArrangeDone: 'Done',
+    soundpadArrangeHint: 'Drag by the handle or use the arrows. Pads do not play while arranging.',
+    soundpadArrangeEmpty: 'Add at least two sounds to arrange them.',
     utilitiesBlurb: 'Ceremony sounds and instrument tuner.'
   },
   es: {
@@ -416,6 +420,10 @@ export const translations = {
     soundpadStop: 'Parar este sonido',
     soundpadStopVoice: 'Parar',
     soundpadIdle: 'Nada sonando',
+    soundpadArrange: 'Organizar',
+    soundpadArrangeDone: 'Listo',
+    soundpadArrangeHint: 'Arrastrá desde el asa o usá las flechas. Mientras organizás, los pads no suenan.',
+    soundpadArrangeEmpty: 'Agregá al menos dos sonidos para poder ordenarlos.',
     utilitiesBlurb: 'Sonidos de la ceremonia y afinador de instrumentos.'
   }
 };

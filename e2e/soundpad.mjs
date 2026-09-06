@@ -308,6 +308,41 @@ check('un pad restaurado desde el pack vuelve a sonar', await countPlaying() ===
 await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
 rmSync(packPath, { force: true });
 
+// ── Modo organizar ──────────────────────────────────────────────────────────
+// Por id y no por texto: el pad muestra nombre, insignias y duración juntos.
+const idsDePads = () => page.evaluate(() =>
+  [...document.querySelectorAll('[data-pad-id]')].map(el => el.getAttribute('data-pad-id')));
+
+const antesDeOrdenar = await idsDePads();
+await page.getByRole('button', { name: /^(Organizar|Arrange)$/ }).click();
+await page.waitForTimeout(500);
+check('organizar oculta la grilla y muestra la lista',
+  await page.locator('[data-arrange-id]').count() === antesDeOrdenar.length &&
+  await page.locator('[data-pad-id]').count() === 0);
+
+// El último sube hasta el principio con las flechas, que es lo único que
+// funciona en táctil y con teclado.
+const ultimo = antesDeOrdenar[antesDeOrdenar.length - 1];
+for (let i = 0; i < antesDeOrdenar.length - 1; i++) {
+  await page.locator(`[data-move-up="${ultimo}"]`).click();
+  await page.waitForTimeout(120);
+}
+await page.getByRole('button', { name: /^(Listo|Done)$/ }).click();
+await page.waitForTimeout(1200);
+
+const despues = await idsDePads();
+check('el pad movido queda primero', despues[0] === ultimo, `primero: ${despues[0]}, esperado: ${ultimo}`);
+check('no se perdió ni se duplicó ningún pad',
+  despues.length === antesDeOrdenar.length && new Set(despues).size === despues.length);
+
+// El orden tiene que sobrevivir a una recarga: si sólo cambió en memoria, no
+// sirve de nada para la próxima ceremonia.
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('[data-mode]', { timeout: 20000 });
+await page.getByRole('button', { name: /Utilitarios|Utilities/ }).first().click();
+await page.waitForTimeout(1500);
+check('el orden nuevo sobrevive a recargar la página', (await idsDePads())[0] === ultimo);
+
 // ── Regresiones de las auditorías ───────────────────────────────────────────
 
 // (a) Desplazarse por la grilla no debe disparar sonidos.
