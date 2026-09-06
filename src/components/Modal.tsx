@@ -1,6 +1,6 @@
 // Modal de la app. Estaba dentro de App.tsx; se extrajo para que también lo use
 // el Soundpad sin importar desde App (lo que crearía un ciclo de imports).
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { X } from 'lucide-react';
 
@@ -14,14 +14,20 @@ interface ModalProps {
 }
 
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, widthClass = 'max-w-md' }) => {
+  // `onClose` llega como flecha en línea desde todos los llamadores, así que
+  // cambia de identidad en cada render del padre. Guardarla en una referencia
+  // evita desmontar y volver a montar el listener de Escape con cada uno.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
   return (

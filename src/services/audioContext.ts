@@ -30,17 +30,3 @@ export function getAudioContext(): AudioContext | null {
   }
   return ctx;
 }
-
-/**
- * Reanuda el contexto si el navegador lo dejó suspendido. Hay que llamarlo desde
- * un gesto del usuario (toque o clic): iOS y Android arrancan el contexto
- * suspendido y sólo lo liberan dentro del manejador del gesto. En iOS además el
- * contexto se vuelve a suspender cuando se bloquea la pantalla o la app pasa a
- * segundo plano, así que también conviene llamarlo al volver al frente.
- */
-export function resumeAudioContext(): void {
-  const c = getAudioContext();
-  if (c && c.state === 'suspended') {
-    c.resume().catch((e) => console.warn('No se pudo reanudar el AudioContext', e));
-  }
-}

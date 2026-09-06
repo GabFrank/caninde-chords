@@ -9,7 +9,7 @@
 // El contexto se comparte con el afinador (`audioContext.ts`), pero la cadena es
 // propia: el afinador colorea su señal para sonar a guitarra.
 
-import { getAudioContext, resumeAudioContext } from './audioContext';
+import { getAudioContext } from './audioContext';
 import { getSound } from './soundLibrary';
 import { SoundPad } from '../types';
 
@@ -39,7 +39,10 @@ export class MissingAudioError extends Error {
  */
 export function computePlayback(bufferDurationSec: number, repeat: number): { loop: boolean; stopAfterSec: number | null } {
   if (!Number.isFinite(repeat) || repeat <= 0) return { loop: true, stopAfterSec: null };
-  const times = Math.min(Math.floor(repeat), MAX_REPEAT);
+  // `Math.max(1, ...)`: un `repeat` fraccionario (0.5, que puede venir en el
+  // manifiesto de un pack) daba cero pasadas, o sea un `stop()` programado en el
+  // mismo instante del `start()`, y el pad no sonaba nunca.
+  const times = Math.min(Math.max(1, Math.floor(repeat)), MAX_REPEAT);
   if (times === 1) return { loop: false, stopAfterSec: bufferDurationSec };
   return { loop: true, stopAfterSec: bufferDurationSec * times };
 }
@@ -92,6 +95,8 @@ export class SoundpadEngine {
   private master: GainNode | null = null;
   private buffers = new Map<string, AudioBuffer>();
   private decoding = new Map<string, Promise<AudioBuffer>>();
+  /** Claves olvidadas mientras se decodificaban: su resultado ya no vale. */
+  private stale = new Set<string>();
   private voices = new Map<string, Voice>();
   private listeners = new Set<Listener>();
   private masterVolume = 0.9;
@@ -128,8 +133,13 @@ export class SoundpadEngine {
    * usuario: en móvil el audio no arranca de otra forma.
    */
   unlock(): void {
-    this.init();
-    resumeAudioContext();
+    const ctx = this.init();
+    // El contexto propio, no el singleton global: el motor puede haber recibido
+    // otro por inyección (las pruebas lo hacen) y reanudar el equivocado sería
+    // un no-op silencioso.
+    if (ctx?.state === 'suspended') {
+      ctx.resume().catch(e => console.warn('No se pudo reanudar el AudioContext', e));
+    }
   }
 
   // ── Buffers ────────────────────────────────────────────────────────────────
@@ -145,12 +155,15 @@ export class SoundpadEngine {
     const ctx = this.init();
     if (!ctx) throw new Error('No hay AudioContext disponible.');
 
+    this.stale.delete(fileKey);
     const job = (async () => {
       const blob = await getSound(fileKey);
       if (!blob) throw new MissingAudioError(fileKey);
       const bytes = await blob.arrayBuffer();
       const buffer = await ctx.decodeAudioData(bytes);
-      this.buffers.set(fileKey, buffer);
+      // Si el archivo se reemplazó mientras se decodificaba, este resultado ya
+      // no es el que corresponde: se devuelve, pero no se cachea.
+      if (!this.stale.has(fileKey)) this.buffers.set(fileKey, buffer);
       return buffer;
     })();
 
@@ -180,9 +193,17 @@ export class SoundpadEngine {
     return { missing };
   }
 
-  /** Olvida un audio ya decodificado (al reemplazar el archivo de un pad). */
+  /**
+   * Olvida un audio (al reemplazar el archivo de un pad o al importar un pack).
+   *
+   * También descarta la decodificación en vuelo si la hay: si no, al terminar
+   * volvía a escribir el buffer viejo en el caché y ya no había forma de
+   * desalojarlo.
+   */
   forget(fileKey: string): void {
     this.buffers.delete(fileKey);
+    this.stale.add(fileKey);
+    this.decoding.delete(fileKey);
   }
 
   hasBuffer(fileKey: string): boolean {
@@ -238,6 +259,9 @@ export class SoundpadEngine {
     this.voices.set(voiceId, voice);
     source.onended = () => {
       this.voices.delete(voiceId);
+      // Desconectar explícitamente: sin fuente viva son recolectables igual,
+      // pero así no queda la duda de si el grafo crece con cada disparo.
+      try { gain.disconnect(); } catch { /* ya desconectado */ }
       this.notify();
     };
     this.notify();

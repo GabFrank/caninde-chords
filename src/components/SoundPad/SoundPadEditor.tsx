@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Upload, Play, Square, Trash2, Layers, Scissors, Infinity as InfinityIcon } from 'lucide-react';
 import { Modal } from '../Modal';
 import { SoundCategory, SoundPad } from '../../types';
+import { Strings } from '../../translations';
 import { ACCEPTED_AUDIO, formatBytes, formatDuration } from '../../services/soundLibrary';
 import { MAX_REPEAT } from '../../services/soundpadEngine';
 import {
@@ -26,7 +27,7 @@ interface SoundPadEditorProps {
   onPreview: (pad: SoundPad) => void;
   onStopPreview: (pad: SoundPad) => void;
   previewing: boolean;
-  t: Record<string, string>;
+  t: Strings;
 }
 
 const emptyDraft = {
@@ -104,7 +105,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
 
         {/* Archivo */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-zinc-500">{t.soundpadFile}</label>
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{t.soundpadFile}</label>
           <input
             ref={fileInput}
             type="file"
@@ -118,7 +119,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
             className={`w-full min-h-11 px-3 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 text-xs font-bold transition-colors ${missing && !file ? 'border-amber-400 text-amber-600' : 'border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:border-blue-500 hover:text-blue-500'}`}
           >
             <Upload size={14} />
-            {file ? file.name : (pad ? t.soundpadReplaceFile : t.soundpadPickFile)}
+            {file ? file.name : (missing ? t.soundpadRelink : pad ? t.soundpadReplaceFile : t.soundpadPickFile)}
           </button>
           {file && (
             <p className="text-[10px] text-zinc-400">{formatBytes(file.size)}</p>
@@ -135,7 +136,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
 
         {/* Nombre y categoría */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-zinc-500" htmlFor="pad-name">{t.soundpadName}</label>
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400" htmlFor="pad-name">{t.soundpadName}</label>
           <input
             id="pad-name"
             value={draft.name}
@@ -146,7 +147,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-zinc-500" htmlFor="pad-category">{t.soundpadCategory}</label>
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400" htmlFor="pad-category">{t.soundpadCategory}</label>
           <select
             id="pad-category"
             value={draft.categoryId}
@@ -160,7 +161,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
 
         {/* Identidad visual */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-zinc-500">{t.soundpadColor}</label>
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{t.soundpadColor}</label>
           <div className="flex flex-wrap gap-2">
             {SOUNDPAD_COLORS.map(c => (
               <button
@@ -176,7 +177,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-zinc-500">{t.soundpadIcon}</label>
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{t.soundpadIcon}</label>
           <div className="flex flex-wrap gap-1.5">
             {Object.keys(SOUNDPAD_ICONS).map(id => {
               const Icon = padIcon(id);
@@ -198,7 +199,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
 
         {/* Comportamiento */}
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-zinc-500" htmlFor="pad-volume">
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400" htmlFor="pad-volume">
             {t.soundpadVolume} — {Math.round(draft.volume * 100)}%
           </label>
           <input
@@ -206,12 +207,12 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
             type="range" min={0} max={1} step={0.01}
             value={draft.volume}
             onChange={(e) => setDraft(d => ({ ...d, volume: Number(e.target.value) }))}
-            className="w-full accent-blue-600"
+            className="w-full h-11 accent-blue-600 cursor-pointer"
           />
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-zinc-500">{t.soundpadRepeat}</label>
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{t.soundpadRepeat}</label>
           <div className="flex items-center gap-2">
             <input
               type="number" min={1} max={MAX_REPEAT}
@@ -220,7 +221,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
               onChange={(e) => setDraft(d => ({ ...d, repeat: Math.max(1, Math.min(MAX_REPEAT, Number(e.target.value) || 1)) }))}
               className="w-24 min-h-11 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-transparent focus:border-blue-500 outline-none text-sm font-bold disabled:opacity-40"
             />
-            <span className="text-xs text-zinc-500">{draft.repeat === 1 ? t.soundpadRepeatOnce : t.soundpadRepeatTimes}</span>
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">{draft.repeat === 1 ? t.soundpadRepeatOnce : t.soundpadRepeatTimes}</span>
             <button
               type="button"
               onClick={() => setDraft(d => ({ ...d, repeat: d.repeat === 0 ? 1 : 0 }))}
@@ -234,7 +235,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-zinc-500">{t.soundpadOverlay}</label>
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400">{t.soundpadOverlay}</label>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -258,7 +259,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-bold text-zinc-500" htmlFor="pad-fade">{t.soundpadFade}</label>
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400" htmlFor="pad-fade">{t.soundpadFade}</label>
           <input
             id="pad-fade"
             type="number" min={0} max={5000} step={10}
@@ -297,7 +298,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
           <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
             {confirmDelete ? (
               <div className="flex items-center gap-2">
-                <p className="text-xs text-zinc-500 flex-1">{t.soundpadDeletePad}</p>
+                <p className="text-xs text-zinc-600 dark:text-zinc-400 flex-1">{t.soundpadDeletePad}</p>
                 <button
                   type="button"
                   onClick={async () => { await onDelete(pad); onClose(); }}

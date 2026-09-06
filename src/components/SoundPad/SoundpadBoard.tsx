@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../AuthProvider';
 import { useViewport } from '../../lib/useViewport';
 import { SoundPad } from '../../types';
-import { translations } from '../../translations';
+import { translations, Strings } from '../../translations';
 import { formatBytes } from '../../services/soundLibrary';
 import { padColor, UNCATEGORIZED_ID } from '../../lib/soundpadStyles';
 import { useSoundpad } from './useSoundpad';
@@ -29,7 +29,7 @@ const ALL = '__all__';
 
 export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => {
   const { user } = useAuth();
-  const t = translations[lang] as unknown as Record<string, string>;
+  const t = translations[lang];
   const sp = useSoundpad();
   // En teléfono apaisado la cabecera de la app, las dos barras, los chips y el
   // buscador se comían los 390px de alto y no quedaba ni una fila de pads
@@ -162,7 +162,8 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
   const chips: { id: string; label: string; dot?: string; count: number }[] = [
     { id: ALL, label: t.soundpadAll, count: sp.pads.length },
     { id: FAVORITES, label: t.soundpadFavorites, count: sp.pads.filter(p => p.favorite).length },
-    ...sp.categories.map(c => ({ id: c.id, label: c.name, dot: padColor(c.color).dot, count: countByCategory[c.id] ?? 0 })),
+    ...sp.categories.filter(c => c.id !== UNCATEGORIZED_ID)
+      .map(c => ({ id: c.id, label: c.name, dot: padColor(c.color).dot, count: countByCategory[c.id] ?? 0 })),
     { id: UNCATEGORIZED_ID, label: t.soundpadUncategorized, count: countByCategory[UNCATEGORIZED_ID] ?? 0 },
   ].filter(chip => chip.id === ALL || chip.count > 0 || chip.id === FAVORITES);
 

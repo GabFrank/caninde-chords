@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where,
+  addDoc, collection, deleteDoc, deleteField, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { useAuth } from '../AuthProvider';
@@ -140,7 +140,16 @@ export function useSoundpad() {
 
   // ── Acciones sobre el catálogo ─────────────────────────────────────────────
 
-  const nextOrder = useCallback(() => (pads.reduce((m, p) => Math.max(m, p.order ?? 0), 0) + 1), [pads]);
+  /**
+   * Los pads nuevos van al final. Se usa el reloj y no `max(order)+1` porque dos
+   * altas seguidas, antes de que llegue el snapshot de la primera, recibían el
+   * mismo número.
+   */
+  const nextOrder = () => Date.now();
+
+  /** Firestore rechaza los textos largos; el recorte vive en un solo sitio. */
+  const padName = (v: string) => v.slice(0, 59);
+  const categoryName = (v: string) => v.slice(0, 39);
 
   /**
    * Crea un pad: primero el archivo en el dispositivo, después la ficha.
@@ -184,7 +193,7 @@ export function useSoundpad() {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }).catch(e => reportFirestore(e, OperationType.CREATE, 'soundPads', setError));
-  }, [user, nextOrder]);
+  }, [user]);
 
   /**
    * Cambia la ficha de un pad. Con `file`, reemplaza además su audio.
@@ -207,7 +216,9 @@ export function useSoundpad() {
         patch.fileKey = newKey;
         patch.fileName = file.name.slice(0, 199);
         patch.fileSize = file.size;
-        if (durationMs) patch.durationMs = durationMs;
+        // Si la duración del archivo nuevo no se puede leer, se BORRA el campo:
+        // dejarlo mostraría la duración del archivo anterior.
+        patch.durationMs = durationMs ?? deleteField();
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         throw e;
@@ -249,7 +260,7 @@ export function useSoundpad() {
   const createCategory = useCallback(async (name: string, color: string) => {
     if (!user) return;
     addDoc(collection(db, 'soundCategories'), {
-      name: name.slice(0, 39),
+      name: categoryName(name),
       color,
       order: categories.reduce((m, c) => Math.max(m, c.order ?? 0), 0) + 1,
       ownerId: user.uid,
@@ -260,7 +271,7 @@ export function useSoundpad() {
   const updateCategory = useCallback(async (category: SoundCategory, changes: Partial<SoundCategory>) => {
     updateDoc(doc(db, 'soundCategories', category.id), {
       ...changes,
-      ...(changes.name ? { name: changes.name.slice(0, 39) } : {}),
+      ...(changes.name ? { name: categoryName(changes.name) } : {}),
     }).catch(e => reportFirestore(e, OperationType.UPDATE, `soundCategories/${category.id}`, setError));
   }, []);
 

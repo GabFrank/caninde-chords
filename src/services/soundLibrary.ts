@@ -94,6 +94,12 @@ export function listKeys(): Promise<string[]> {
     .then(keys => keys.map(String));
 }
 
+/** Cuánto ocupan los audios del Soundpad, sumando los blobs guardados. */
+export function soundsBytes(): Promise<number> {
+  return tx<Blob[]>('readonly', store => store.getAll())
+    .then(blobs => blobs.reduce((total, b) => total + (b?.size ?? 0), 0));
+}
+
 /**
  * Borra los audios que ya no referencia ningún pad: si un pad se borró desde
  * otro dispositivo, su archivo queda acá ocupando cuota sin que nada lo apunte.
@@ -118,36 +124,58 @@ export function selectOrphans(allKeys: string[], usedKeys: string[], protectedKe
 }
 
 export interface StorageUsage {
+  /** Lo que ocupan los audios del Soundpad, no todo el origen. */
   usedBytes: number;
   quotaBytes: number;
   /** true si el navegador se comprometió a no evacuar estos datos. */
   persistent: boolean;
 }
 
+/** El permiso persistente se pide una sola vez por sesión, no en cada pasada. */
+let persistAsked: Promise<boolean> | null = null;
+
+function ensurePersistent(): Promise<boolean> {
+  if (persistAsked) return persistAsked;
+  persistAsked = (async () => {
+    if (typeof navigator === 'undefined' || !navigator.storage) return false;
+    try {
+      if (await navigator.storage.persisted?.()) return true;
+      return await navigator.storage.persist?.() ?? false;
+    } catch {
+      // Firefox puede pedir confirmación al usuario y rechazar: no es un error.
+      return false;
+    }
+  })();
+  return persistAsked;
+}
+
 /**
- * Cuánto espacio ocupan los audios y si el almacenamiento es persistente.
+ * Cuánto ocupan los sonidos y si el almacenamiento es persistente.
  *
- * Pide `navigator.storage.persist()`: sin eso el navegador puede liberar
- * IndexedDB cuando le falta espacio, y la biblioteca de sonidos desaparecería
- * en medio de una ceremonia. Con permiso concedido, sólo se borra si el usuario
- * lo borra.
+ * `usedBytes` sale de sumar los blobs, no de `navigator.storage.estimate()`:
+ * ese número incluye la caché de Firestore y la del service worker, y mostrarlo
+ * como "espacio usado" del Soundpad daba una cifra que no se correspondía con
+ * nada que el usuario pudiera borrar desde acá.
+ *
+ * Se pide `navigator.storage.persist()` porque sin eso el navegador puede
+ * liberar IndexedDB cuando le falta espacio, y la biblioteca de sonidos
+ * desaparecería en medio de una ceremonia.
  */
 export async function estimateUsage(): Promise<StorageUsage> {
-  const empty: StorageUsage = { usedBytes: 0, quotaBytes: 0, persistent: false };
-  if (typeof navigator === 'undefined' || !navigator.storage) return empty;
-  let persistent = false;
+  const persistent = await ensurePersistent();
+  let usedBytes = 0;
   try {
-    persistent = await navigator.storage.persisted?.() ?? false;
-    if (!persistent) persistent = await navigator.storage.persist?.() ?? false;
+    usedBytes = await soundsBytes();
   } catch {
-    // Firefox puede pedir confirmación al usuario y rechazar: no es un error.
+    // Sin IndexedDB no hay nada que informar.
   }
+  let quotaBytes = 0;
   try {
-    const est = await navigator.storage.estimate();
-    return { usedBytes: est.usage ?? 0, quotaBytes: est.quota ?? 0, persistent };
+    quotaBytes = (await navigator.storage?.estimate())?.quota ?? 0;
   } catch {
-    return { ...empty, persistent };
+    // La cuota es informativa; su ausencia no es un error.
   }
+  return { usedBytes, quotaBytes, persistent };
 }
 
 /** Tipos de archivo que aceptamos en el selector y al importar un pack. */

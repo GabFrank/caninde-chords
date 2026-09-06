@@ -185,7 +185,12 @@ service cloud.firestore {
     }
 
     function isValidSoundPad(data) {
-      return hasRequiredFields(data, ['name', 'categoryId', 'fileKey', 'volume', 'repeat', 'overlay', 'favorite', 'ownerId', 'createdAt', 'updatedAt']) &&
+      // `hasOnly` importa especialmente acá: la arquitectura del Soundpad manda
+      // el audio a IndexedDB y no a Firestore. Sin este cerrojo, un cliente
+      // modificado podría meter un MP3 en base64 dentro del documento.
+      return hasOnlyAllowedFields(data, ['name', 'categoryId', 'color', 'icon', 'fileKey', 'fileName', 'fileSize', 'durationMs', 'volume', 'repeat', 'overlay', 'fadeOutMs', 'favorite', 'order', 'ownerId', 'createdAt', 'updatedAt']) &&
+             hasRequiredFields(data, ['name', 'categoryId', 'fileKey', 'volume', 'repeat', 'overlay', 'favorite', 'ownerId', 'createdAt', 'updatedAt']) &&
+             data.createdAt is timestamp && data.updatedAt is timestamp &&
              data.name is string && data.name.size() > 0 && data.name.size() < 60 &&
              data.categoryId is string && data.categoryId.size() > 0 && data.categoryId.size() < 128 &&
              data.fileKey is string && data.fileKey.size() > 0 && data.fileKey.size() < 200 &&
@@ -204,7 +209,9 @@ service cloud.firestore {
     }
 
     function isValidSoundCategory(data) {
-      return hasRequiredFields(data, ['name', 'color', 'order', 'ownerId', 'createdAt']) &&
+      return hasOnlyAllowedFields(data, ['name', 'color', 'order', 'ownerId', 'createdAt']) &&
+             hasRequiredFields(data, ['name', 'color', 'order', 'ownerId', 'createdAt']) &&
+             data.createdAt is timestamp &&
              data.name is string && data.name.size() > 0 && data.name.size() < 40 &&
              data.color is string && data.color.size() < 24 &&
              data.order is number &&
@@ -322,6 +329,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
                     resource.data.ownerId == request.auth.uid &&
                     request.resource.data.ownerId == resource.data.ownerId &&
+                    request.resource.data.createdAt == resource.data.createdAt &&
                     isValidSoundPad(request.resource.data);
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
@@ -332,6 +340,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
                     resource.data.ownerId == request.auth.uid &&
                     request.resource.data.ownerId == resource.data.ownerId &&
+                    request.resource.data.createdAt == resource.data.createdAt &&
                     isValidSoundCategory(request.resource.data);
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }

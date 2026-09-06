@@ -54,6 +54,17 @@ export interface ImportResult {
 }
 
 /**
+ * JSZip lee los Blob con FileReader, que no existe en Node. En el navegador se
+ * le pasa el Blob para que lo lea cuando arma el zip; en las pruebas, el
+ * ArrayBuffer. La diferencia importa: con el ArrayBuffer, exportar una
+ * biblioteca grande obliga a tener todos los audios descomprimidos en memoria a
+ * la vez, y una tablet se queda sin.
+ */
+async function zipPayload(blob: Blob): Promise<Blob | ArrayBuffer> {
+  return typeof FileReader === 'undefined' ? blob.arrayBuffer() : blob;
+}
+
+/**
  * Arma el .zip con todo lo que hay. Los pads cuyo audio no esté en este
  * dispositivo se omiten: exportar una ficha sin su archivo sólo trasladaría el
  * problema.
@@ -66,10 +77,7 @@ export async function exportPack(pads: SoundPad[], categories: SoundCategory[]):
   for (const pad of pads) {
     const blob = await getSound(pad.fileKey);
     if (!blob) continue;
-    // Se pasa el ArrayBuffer y no el Blob: JSZip lee los Blob con FileReader,
-    // que no existe fuera del navegador, y eso dejaría este servicio sin poder
-    // probarse. `arrayBuffer()` funciona en los dos lados.
-    folder.file(pad.fileKey, await blob.arrayBuffer());
+    folder.file(pad.fileKey, await zipPayload(blob));
     included.push({
       name: pad.name,
       categoryId: pad.categoryId,
@@ -150,8 +158,7 @@ function sanitizePackPad(raw: unknown): PackPad | null {
  * conoce al usuario y ya sabe qué pads existen.
  */
 export async function importPack(file: File | Blob, existing: { fileKeys: Set<string>; categoryIds: Set<string> }): Promise<ImportResult> {
-  // Igual que al exportar: ArrayBuffer, no Blob (ver exportPack).
-  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const zip = await JSZip.loadAsync(await zipPayload(file));
   const manifestFile = zip.file(MANIFEST);
   if (!manifestFile) throw new Error('pack-invalido');
 

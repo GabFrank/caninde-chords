@@ -3,6 +3,9 @@
 // no necesita red, y tras la primera carga los samples quedan en la caché del
 // service worker.
 //
+// Sólo expone lo que el afinador usa: `init`, `pluckNote`, `ctx` y las cuerdas.
+// Los rasgueos, patrones rítmicos y drone se fueron con el Yggdrasil.
+//
 // El Soundpad NO pasa por acá: esta cadena colorea la señal (realce de graves,
 // atenuación de agudos y reverb) para que suene a guitarra, y eso destrozaría un
 // trueno o un sonido de naturaleza. El Soundpad tiene su propia cadena limpia en
@@ -18,7 +21,6 @@ export class BaseAudioEngine {
   public ctx: AudioContext | null = null;
   private masterVolumeNode: GainNode | null = null;
   private buffersCache: Record<number, AudioBuffer> = {};
-  private activeSources: { source: AudioBufferSourceNode; gain: GainNode }[] = [];
   // Real sampled guitar (SoundFont). Loaded lazily; synthesis is the fallback.
   private sf: any = null;
   private sfReady = false;
@@ -129,13 +131,6 @@ export class BaseAudioEngine {
       }
     }
     return ir;
-  }
-
-  setMasterVolume(vol: number) {
-    this.init();
-    if (this.masterVolumeNode) {
-      this.masterVolumeNode.gain.value = Math.max(0, Math.min(1, vol));
-    }
   }
 
   // Warm Karplus-Strong pluck: lowpassed excitation + a one-pole loop filter whose
@@ -250,24 +245,6 @@ export class BaseAudioEngine {
     gainNode.connect(this.masterVolumeNode!);
     source.start(absoluteTime);
     source.stop(absoluteTime + 3.2);
-
-    const activeItem = { source, gain: gainNode };
-    this.activeSources.push(activeItem);
-    source.onended = () => {
-      this.activeSources = this.activeSources.filter(x => x.source !== source);
-    };
-  }
-
-  stopAll() {
-    if (this.sf) {
-      try { this.sf.stop(); } catch (e) {}
-    }
-    this.activeSources.forEach(s => {
-      try {
-        s.source.stop();
-      } catch (e) {}
-    });
-    this.activeSources = [];
   }
 }
 

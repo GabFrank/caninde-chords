@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Check, X } from 'lucide-react';
 import { Modal } from '../Modal';
 import { SoundCategory } from '../../types';
+import { Strings } from '../../translations';
 import { SOUNDPAD_COLORS, padColor } from '../../lib/soundpadStyles';
 
 interface CategoryManagerProps {
@@ -16,7 +17,7 @@ interface CategoryManagerProps {
   onCreate: (name: string, color: string) => Promise<void>;
   onUpdate: (category: SoundCategory, changes: Partial<SoundCategory>) => Promise<void>;
   onDelete: (category: SoundCategory) => Promise<void>;
-  t: Record<string, string>;
+  t: Strings;
 }
 
 export const CategoryManager: React.FC<CategoryManagerProps> = ({
@@ -58,7 +59,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
       <div className="space-y-5">
 
         <form onSubmit={add} className="space-y-2">
-          <label className="text-xs font-bold text-zinc-500" htmlFor="cat-name">{t.soundpadNewCategory}</label>
+          <label className="text-xs font-bold text-zinc-600 dark:text-zinc-400" htmlFor="cat-name">{t.soundpadNewCategory}</label>
           <div className="flex gap-2">
             <input
               id="cat-name"
@@ -177,7 +178,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({
         </div>
 
         {confirmId && (
-          <p className="text-[10px] text-zinc-500 leading-relaxed">{t.soundpadDeleteCategory}</p>
+          <p className="text-[10px] text-zinc-600 dark:text-zinc-400 leading-relaxed">{t.soundpadDeleteCategory}</p>
         )}
       </div>
     </Modal>

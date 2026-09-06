@@ -121,7 +121,12 @@ export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
         onContextMenu={(e) => { e.preventDefault(); onEdit(pad); }}
         data-pad-id={pad.id}
         data-playing={playing ? 'true' : 'false'}
-        aria-label={`${pad.name}${missing ? ` — ${labels.missing}` : ''}`}
+        aria-label={[
+          pad.name,
+          missing ? labels.missing : null,
+          pad.overlay ? labels.overlayOn : labels.overlayOff,
+          loop ? labels.loop : pad.repeat > 1 ? `${pad.repeat}×` : null,
+        ].filter(Boolean).join(' — ')}
         aria-pressed={playing}
         className={`w-full ${dense ? 'min-h-[62px] pt-5 px-1.5 pb-1.5' : 'min-h-[88px] pt-6 px-2 pb-2.5'} rounded-2xl border-2 flex flex-col items-center justify-center gap-1 text-center transition-colors select-none active:scale-[0.97] ${playing ? color.active : color.surface} ${missing ? 'opacity-60 border-dashed' : ''}`}
         style={{ touchAction: 'pan-y' }}
@@ -136,11 +141,12 @@ export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
             <AlertTriangle size={10} />
           ) : (
             <>
-              {pad.overlay
-                ? <Layers size={10} aria-label={labels.overlayOn} />
-                : <Scissors size={10} aria-label={labels.overlayOff} />}
+              {/* Sin `aria-label`: el botón ya lleva el suyo y su subárbol no se
+                  expone, así que estas etiquetas eran inertes. Lo que cuentan
+                  estos íconos va en el nombre accesible del botón. */}
+              {pad.overlay ? <Layers size={10} /> : <Scissors size={10} />}
               {loop
-                ? <InfinityIcon size={10} aria-label={labels.loop} />
+                ? <InfinityIcon size={10} />
                 : pad.repeat > 1 && (
                     <span className="inline-flex items-center gap-0.5">
                       <Repeat size={10} />{pad.repeat}

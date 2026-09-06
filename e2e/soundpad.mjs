@@ -13,6 +13,7 @@
  * Firebase Auth, igual que en `smoke.mjs`.
  */
 import { chromium } from 'playwright';
+import { execSync } from 'child_process';
 import { readFileSync, existsSync, statSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { createServer } from 'http';
@@ -103,8 +104,19 @@ const check = (name, ok, extra = '') => { results.push(`${ok ? '✓' : '✗'} ${
 await page.getByRole('button', { name: /Utilitarios|Utilities/ }).first().click();
 await page.waitForTimeout(400);
 check('la pestaña Utilitarios abre el Soundpad', await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).count() > 0);
-check('el Yggdrasil ya no está', await page.getByText(/Yggdrasil/).count() === 0);
-check('el Manual de Conexiones ya no está', await page.getByText(/Manual de Conexiones|Connections Manual/).count() === 0);
+// Sobre el código y no sobre el DOM: comprobar que un texto no está en la
+// pantalla actual pasaría igual si los módulos siguieran vivos tras otra pestaña.
+// Se buscan los identificadores, que sólo pueden aparecer en código; el nombre
+// "Yggdrasil" se busca aparte y sólo en los textos visibles, porque un
+// comentario que explique qué se retiró y por qué es legítimo.
+const restos = execSync(
+  "grep -rlE 'HarmonyComposer|HarmonyManual|harmonyEngine' " + join(ROOT, 'src') + " || true",
+  { encoding: 'utf8' }).trim();
+check('no queda código de los módulos retirados', restos === '', restos);
+const textos = execSync(
+  "grep -lE 'Yggdrasil|Manual de Conexiones' " + join(ROOT, 'src/translations.ts') + " || true",
+  { encoding: 'utf8' }).trim();
+check('no queda ningún texto visible de los módulos retirados', textos === '', textos);
 // Se ENTRA al Afinador, no se comprueba que exista su botón: el riesgo real de
 // haber adelgazado `audioEngine` es que el afinador reviente al montarse, y eso
 // una comprobación sobre la pestaña no lo vería.
@@ -171,8 +183,8 @@ async function addPad(name, { overlay, loop }) {
   await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
   await page.waitForTimeout(200);
   await page.locator('#pad-name').fill(name);
-  if (!overlay) await page.getByRole('button', { name: /Corta todo lo demás|Stops everything/ }).click();
-  if (loop) await page.getByRole('button', { name: /En bucle hasta pararlo|Loop until stopped/ }).click();
+  if (!overlay) await page.getByRole('button', { name: /^(Corta todo lo demás antes de sonar|Stops everything else first)$/ }).click();
+  if (loop) await page.getByRole('button', { name: /^(En bucle hasta pararlo|Loop until stopped)$/ }).click();
   await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
   await page.waitForTimeout(900);
 }
@@ -195,6 +207,53 @@ check('un pad exclusivo corta a los que sonaban', tras === 1, `activos: ${tras}`
 
 await page.waitForTimeout(1200);
 check('un pad de una sola pasada se apaga solo al terminar', await countPlaying() === 0, `activos: ${await countPlaying()}`);
+
+// ── Los tres ajustes por sonido se guardan y se releen ──────────────────────
+// Overlay ya quedó cubierto arriba por su efecto audible; volumen y repeticiones
+// se comprueban por lo que el editor muestra al reabrir el pad.
+await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
+await page.waitForTimeout(300);
+await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
+await page.waitForTimeout(200);
+await page.locator('#pad-name').fill('Cuenco');
+await page.locator('#pad-volume').fill('0.4');
+await page.locator('input[type=number]').first().fill('3');
+await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
+await page.waitForTimeout(1000);
+
+await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
+  .getByRole('button', { name: /Editar|Edit/ }).click();
+await page.waitForTimeout(400);
+check('el volumen del pad se guardó', await page.locator('#pad-volume').inputValue() === '0.4',
+  `valor: ${await page.locator('#pad-volume').inputValue()}`);
+check('las repeticiones se guardaron', await page.locator('input[type=number]').first().inputValue() === '3');
+await page.getByRole('button', { name: /^Cerrar$/ }).click();
+await page.waitForTimeout(300);
+
+// ── Categorías: son uno de los requisitos y no tenían ninguna cobertura ──────
+await page.getByRole('button', { name: /^(Categorías|Categories)$/ }).click();
+await page.waitForTimeout(400);
+await page.locator('#cat-name').fill('Naturaleza');
+await page.getByRole('button', { name: /^(Nueva categoría|New category)$/ }).click();
+await page.waitForTimeout(900);
+check('la categoría aparece en el modal', await page.getByText('Naturaleza').count() > 0);
+await page.getByRole('button', { name: /^Cerrar$/ }).click();
+await page.waitForTimeout(400);
+check('la categoría no aparece como filtro mientras esté vacía',
+  await page.getByRole('button', { name: /^Naturaleza / }).count() === 0);
+
+await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
+  .getByRole('button', { name: /Editar|Edit/ }).click();
+await page.waitForTimeout(400);
+await page.locator('#pad-category').selectOption({ label: 'Naturaleza' });
+await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
+await page.waitForTimeout(1000);
+await page.getByRole('button', { name: /^Naturaleza / }).click();
+await page.waitForTimeout(400);
+check('el filtro de la categoría muestra sólo su pad',
+  await page.locator('[data-pad-id]').count() === 1);
+await page.getByRole('button', { name: /^(Todos|All) / }).first().click();
+await page.waitForTimeout(300);
 
 // ── Ida y vuelta del pack ────────────────────────────────────────────────────
 // Es el único camino para llevar los audios a otro dispositivo, así que se prueba
@@ -226,6 +285,7 @@ const clavesGuardadas = () => page.evaluate(() => new Promise(res => {
 }));
 
 // Simula el dispositivo nuevo: las fichas llegaron por Firestore, los audios no.
+const audiosAntes = await clavesGuardadas();
 await borrarAudios();
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.waitForSelector('[data-mode]', { timeout: 20000 });
@@ -237,7 +297,8 @@ check('sin los audios, los pads avisan que falta el archivo',
 await page.locator('input[type=file][accept*="zip"]').setInputFiles(packPath);
 await page.waitForTimeout(2500);
 const restaurados = await clavesGuardadas();
-check('importar el pack devuelve los audios al dispositivo', restaurados === 4, `claves: ${restaurados}`);
+check('importar el pack devuelve todos los audios al dispositivo', restaurados === audiosAntes,
+  `restaurados ${restaurados} de ${audiosAntes}`);
 check('el aviso de audio faltante desaparece',
   await page.getByText(/La ficha del sonido se sincronizó|The sound card is synced/).count() === 0);
 

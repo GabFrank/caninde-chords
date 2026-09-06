@@ -1,5 +1,8 @@
 export type Language = 'en' | 'es';
 
+/** Las claves de la interfaz, tipadas: una clave mal escrita no compila. */
+export type Strings = typeof translations['es'];
+
 export const translations = {
   en: {
     songs: 'Songs',
