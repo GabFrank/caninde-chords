@@ -33,6 +33,16 @@ describe('isTypingTarget', () => {
     expect(isTypingTarget({ tagName: 'BUTTON' } as HTMLElement)).toBe(false);
     expect(isTypingTarget(null)).toBe(false);
   });
+
+  it('un deslizador NO es escribir', () => {
+    // Tratarlo como campo de texto dejaba al operador sin atajos —y sin
+    // pánico— justo después de tocar el volumen general.
+    expect(isTypingTarget({ tagName: 'INPUT', type: 'range' } as HTMLInputElement)).toBe(false);
+    expect(isTypingTarget({ tagName: 'INPUT', type: 'checkbox' } as HTMLInputElement)).toBe(false);
+    expect(isTypingTarget({ tagName: 'INPUT', type: 'text' } as HTMLInputElement)).toBe(true);
+    // Un input sin `type` es de texto.
+    expect(isTypingTarget({ tagName: 'INPUT' } as HTMLInputElement)).toBe(true);
+  });
 });
 
 describe('resolveShortcut', () => {
@@ -48,6 +58,22 @@ describe('resolveShortcut', () => {
     // Si no, cerrar el editor callaría el sonido que se estaba probando.
     expect(resolveShortcut({ key: 'Escape' }, { modalOpen: true })).toBeNull();
     expect(resolveShortcut({ key: '3' }, { modalOpen: true })).toBeNull();
+  });
+
+  it('el pánico funciona aunque el foco esté en el buscador', () => {
+    // Es el único botón que el operador tiene para arreglar un error: no puede
+    // desactivarse porque haya tocado un campo un segundo antes.
+    const target = { tagName: 'INPUT', type: 'text' } as HTMLInputElement;
+    expect(resolveShortcut({ key: 'Escape', target }, cerrado)).toEqual({ kind: 'panic' });
+  });
+
+  it('el pánico funciona mientras se organizan los pads', () => {
+    expect(resolveShortcut({ key: 'Escape' }, { modalOpen: false, arranging: true }))
+      .toEqual({ kind: 'panic' });
+  });
+
+  it('organizando, las teclas de disparo no hacen nada', () => {
+    expect(resolveShortcut({ key: '3' }, { modalOpen: false, arranging: true })).toBeNull();
   });
 
   it('no dispara mientras se escribe', () => {

@@ -20,6 +20,12 @@ export const DEFAULT_FADE_MS = 120;
 /** Techo del fundido configurable, en ms. Coincide con las reglas de Firestore. */
 export const MAX_FADE_MS = 15000;
 
+/**
+ * Fundido de la SEGUNDA petición de parada sobre una voz que ya se está
+ * apagando. Es la salida de emergencia: apretar el pánico dos veces corta.
+ */
+export const SECOND_STOP_SEC = 0.05;
+
 /** Máximo de repeticiones que aceptamos (coincide con las reglas de Firestore). */
 export const MAX_REPEAT = 50;
 
@@ -90,6 +96,10 @@ interface Voice extends ActiveVoice {
    * tiene que apagarse en tres segundos la corte quien la corte.
    */
   fadeSec: number;
+  /** Cuándo está programado que calle, en el reloj del contexto. */
+  stopAt: number | null;
+  /** Ya se le pidió parar: otra petición más tiene que cortar en seco. */
+  stopping: boolean;
 }
 
 type Listener = (voices: ActiveVoice[]) => void;
@@ -271,6 +281,8 @@ export class SoundpadEngine {
       source,
       gain,
       fadeSec: resolveFadeSec(pad),
+      stopAt: stopAfterSec === null ? null : now + stopAfterSec,
+      stopping: false,
     };
     this.voices.set(voiceId, voice);
     source.onended = () => {
@@ -330,7 +342,22 @@ export class SoundpadEngine {
     const ctx = this.ctx;
     if (!ctx) return;
     const now = ctx.currentTime;
-    const end = now + Math.max(0.01, overrideSec ?? voice.fadeSec);
+
+    // Segunda petición sobre una voz que ya se apaga: se corta en seco. Si no,
+    // insistir con el pánico REINICIABA el fundido desde el volumen del momento
+    // y alejaba el silencio en vez de acercarlo.
+    const pedido = voice.stopping
+      ? Math.min(SECOND_STOP_SEC, overrideSec ?? voice.fadeSec)
+      : (overrideSec ?? voice.fadeSec);
+    let end = now + Math.max(0.01, pedido);
+
+    // NUNCA más tarde de lo que ya iba a callar. En Web Audio la última llamada
+    // a `stop()` es la que manda, así que un fundido más largo que lo que le
+    // quedaba de repeticiones ALARGABA el sonido: parar un pad de 6 s con 15 s
+    // de fundido lo dejaba sonando 15,6 s. El pánico tiene que acortar siempre.
+    if (voice.stopAt !== null) end = Math.min(end, voice.stopAt);
+    end = Math.max(now + 0.01, end);
+
     try {
       voice.gain.gain.cancelScheduledValues(now);
       voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
@@ -348,6 +375,8 @@ export class SoundpadEngine {
     // La voz sale del registro cuando `onended` dispara, al terminar el fundido.
     // Adelantar `endsAt` hace que la barra de progreso muestre el apagado.
     voice.endsAt = end;
+    voice.stopAt = end;
+    voice.stopping = true;
   }
 
   isPadPlaying(padId: string): boolean {

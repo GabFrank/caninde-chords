@@ -36,6 +36,7 @@ interface SoundPadButtonProps {
     overlayOff: string;
     loop: string;
     stop: string;
+    shortcut: string;
   };
 }
 
@@ -126,6 +127,7 @@ export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
         data-playing={playing ? 'true' : 'false'}
         aria-label={[
           pad.name,
+          shortcut ? `${labels.shortcut} ${shortcut}` : null,
           missing ? labels.missing : null,
           pad.overlay ? labels.overlayOn : labels.overlayOff,
           loop ? labels.loop : pad.repeat > 1 ? `${pad.repeat}×` : null,
@@ -135,12 +137,15 @@ export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
         style={{ touchAction: 'pan-y' }}
       >
         <Icon size={dense ? 16 : 22} className="shrink-0" />
-        {/* La tecla que lo dispara, abajo a la izquierda: en un tablero de
-            veinte sonidos es la diferencia entre buscar y disparar. */}
+        {/* La tecla que lo dispara: en un tablero de veinte sonidos es la
+            diferencia entre buscar y disparar, así que tiene que leerse en
+            penumbra. Va arriba a la izquierda porque abajo la tapaba la barra
+            de progreso justo cuando el pad estaba sonando. */}
         {shortcut && (
           <span
             aria-hidden="true"
-            className="absolute bottom-1 left-1.5 text-[9px] font-mono font-black opacity-40 tabular-nums"
+            data-shortcut={shortcut}
+            className="absolute top-1 left-1 h-5 w-5 rounded-md bg-black/10 dark:bg-white/15 flex items-center justify-center text-[11px] font-mono font-black tabular-nums"
           >
             {shortcut}
           </span>
@@ -186,27 +191,43 @@ export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
           con 10px de canalón, dos controles que sobresalen 8px se solapan con los
           del pad vecino y el operador marca un favorito cuando quería disparar.
           Miden 36px, que es el área táctil mínima razonable. */}
-      <button
-        type="button"
-        onClick={() => onToggleFavorite(pad)}
-        aria-label={labels.favorite}
-        aria-pressed={pad.favorite}
-        className="absolute top-0.5 left-0.5 h-9 w-9 rounded-full flex items-center justify-center"
-      >
-        <Star size={13} className={pad.favorite ? 'fill-amber-400 text-amber-400' : 'text-current opacity-45'} />
-      </button>
-      {/* Mientras suena, el mismo sitio es "parar este sonido": un ambiente largo
-          de una sola pasada no se puede cortar volviendo a tocar el pad (se
-          superpondría consigo mismo si es de overlay), y buscar su ficha en la
-          franja de arriba es demasiado lento en vivo. Editar puede esperar. */}
-      <button
-        type="button"
-        onClick={() => (playing ? onStop(pad) : onEdit(pad))}
-        aria-label={playing ? labels.stop : labels.edit}
-        className={`absolute top-0.5 right-0.5 h-9 w-9 rounded-full flex items-center justify-center ${playing ? 'text-red-100' : 'text-current opacity-45 hover:opacity-100'}`}
-      >
-        {playing ? <Square size={13} className="fill-current" /> : <Settings2 size={13} />}
-      </button>
+      {/* Mientras suena, el sitio del favorito pasa a ser "parar este sonido":
+          marcar un favorito puede esperar, cortar un ambiente no. Así el
+          engranaje sigue siendo SIEMPRE editar — antes, un pad en bucle estaba
+          `playing` para siempre y no había forma de abrir su ficha. */}
+      {!dense && (playing ? (
+        <button
+          type="button"
+          onClick={() => onStop(pad)}
+          aria-label={`${labels.stop}: ${pad.name}`}
+          className="absolute top-0.5 left-0.5 h-9 w-9 rounded-full flex items-center justify-center text-red-100"
+        >
+          <Square size={13} className="fill-current" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onToggleFavorite(pad)}
+          aria-label={`${labels.favorite}: ${pad.name}`}
+          aria-pressed={pad.favorite}
+          className="absolute top-0.5 left-0.5 h-9 w-9 rounded-full flex items-center justify-center"
+        >
+          <Star size={13} className={pad.favorite ? 'fill-amber-400 text-amber-400' : 'text-current opacity-45'} />
+        </button>
+      ))}
+      {/* En modo denso (teléfono apaisado, pads de 62px) los controles de
+          esquina ocupaban más de la mitad del alto: un toque desviado paraba el
+          ambiente en vez de disparar. Ahí el pad es sólo para disparar. */}
+      {!dense && (
+        <button
+          type="button"
+          onClick={() => onEdit(pad)}
+          aria-label={`${labels.edit}: ${pad.name}`}
+          className="absolute top-0.5 right-0.5 h-9 w-9 rounded-full flex items-center justify-center text-current opacity-45 hover:opacity-100"
+        >
+          <Settings2 size={13} />
+        </button>
+      )}
     </div>
   );
 };

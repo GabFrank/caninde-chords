@@ -62,6 +62,35 @@ export const SOUNDPAD_ICONS: Record<string, LucideIcon> = {
 
 export const DEFAULT_ICON_ID = 'volume';
 
+/**
+ * Nombre legible de cada ícono, para el `aria-label` del selector. Sin esto un
+ * lector de pantalla en español leía el identificador: "thunder", "bird".
+ */
+export const ICON_LABELS: Record<string, { es: string; en: string }> = {
+  thunder: { es: 'Trueno', en: 'Thunder' },
+  bird: { es: 'Ave', en: 'Bird' },
+  waves: { es: 'Olas', en: 'Waves' },
+  wind: { es: 'Viento', en: 'Wind' },
+  fire: { es: 'Fuego', en: 'Fire' },
+  forest: { es: 'Bosque', en: 'Forest' },
+  rain: { es: 'Lluvia', en: 'Rain' },
+  bell: { es: 'Campana', en: 'Bell' },
+  drum: { es: 'Tambor', en: 'Drum' },
+  sparkles: { es: 'Destellos', en: 'Sparkles' },
+  music: { es: 'Música', en: 'Music' },
+  volume: { es: 'Sonido', en: 'Sound' },
+  mountain: { es: 'Montaña', en: 'Mountain' },
+  sun: { es: 'Sol', en: 'Sun' },
+  moon: { es: 'Luna', en: 'Moon' },
+  zap: { es: 'Rayo', en: 'Lightning' },
+  heart: { es: 'Corazón', en: 'Heart' },
+  star: { es: 'Estrella', en: 'Star' },
+};
+
+export function iconLabel(id: string, lang: 'es' | 'en'): string {
+  return ICON_LABELS[id]?.[lang] ?? id;
+}
+
 export function padIcon(id?: string): LucideIcon {
   return SOUNDPAD_ICONS[id ?? ''] ?? SOUNDPAD_ICONS[DEFAULT_ICON_ID];
 }

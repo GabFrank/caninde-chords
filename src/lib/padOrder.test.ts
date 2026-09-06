@@ -33,10 +33,23 @@ describe('reassignOrder', () => {
     ]);
   });
 
-  it('tolera huecos desordenados y valores repetidos', () => {
+  it('con valores repetidos, respeta igual el orden pedido', () => {
+    // Un pack cuyo manifiesto no traía `order` deja a todos en 0: si los huecos
+    // no se separan, la permutación es inexpresable y reordenar no hacía nada.
+    const pads = [pad('a', 0), pad('b', 0), pad('c', 0)];
+    const cambios = reassignOrder(pads, ['c', 'b', 'a']);
+    const final = ['a', 'b', 'c']
+      .map(id => ({ id, order: cambios.find(c => c.id === id)?.order ?? 0 }))
+      .sort((x, y) => x.order - y.order)
+      .map(x => x.id);
+    expect(final).toEqual(['c', 'b', 'a']);
+  });
+
+  it('separa los huecos empatados sin tocar los que ya crecían', () => {
     const pads = [pad('a', 30), pad('b', 10), pad('c', 10)];
     expect(reassignOrder(pads, ['a', 'b', 'c'])).toEqual([
       { id: 'a', order: 10 },
+      { id: 'b', order: 11 },
       { id: 'c', order: 30 },
     ]);
   });

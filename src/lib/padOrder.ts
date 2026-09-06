@@ -21,7 +21,15 @@ export function reassignOrder<T extends Orderable>(
   const afectados = orderedIds.map(id => byId.get(id)).filter((p): p is T => Boolean(p));
   if (afectados.length < 2) return [];
 
+  // Los huecos se hacen ESTRICTAMENTE crecientes. Si dos pads compartían el
+  // mismo `order` —un pack cuyo manifiesto no lo traía los deja todos en 0— la
+  // permutación pedida era inexpresable y reordenar no hacía nada: el tablero
+  // volvía al orden alfabético del desempate, sin ningún aviso.
   const huecos = afectados.map(p => p.order ?? 0).sort((a, b) => a - b);
+  for (let i = 1; i < huecos.length; i++) {
+    if (huecos[i] <= huecos[i - 1]) huecos[i] = huecos[i - 1] + 1;
+  }
+
   return afectados
     .map((pad, i) => ({ id: pad.id, order: huecos[i] }))
     .filter(({ id, order }) => byId.get(id)!.order !== order);

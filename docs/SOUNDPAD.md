@@ -54,6 +54,7 @@ arregla revinculando el archivo o importando el pack `.zip`.
 | `src/lib/padShortcuts.ts` | Atajos de teclado |
 | `src/lib/padTrim.ts` | Resolución del recorte contra la duración real |
 | `src/lib/waveform.ts` | Picos de la forma de onda |
+| `src/lib/padShortcuts.ts` | Resolución de los atajos de teclado |
 | `src/components/SoundPad/TrimEditor.tsx` | El recortador visual |
 | `src/services/midi.ts` | Web MIDI: permiso, controladores y notas |
 
@@ -209,15 +210,32 @@ Dos cosas que hay que respetar:
 Al **reemplazar el archivo de un pad** las marcas se borran: apuntaban al audio
 viejo, y conservarlas recortaría el nuevo por donde no corresponde.
 
-### 13. El fundido se piensa en segundos
+### 13. Parar nunca puede alargar el sonido
+
+En Web Audio **la última llamada a `stop()` es la que manda**. Como el fundido
+programa su propio `stop()`, un fundido más largo que lo que le quedaba de
+repeticiones REEMPLAZABA el corte anterior por uno más tarde: un pad de 6 s con
+15 s de fundido, al tocar el pánico a los 0,5 s, se callaba a los 15,6 s. El
+único botón que existe para arreglar un error hacía sonar el trueno dos veces y
+media más.
+
+**Reglas, en `fadeOutVoice`:**
+
+- El apagado nunca se programa más tarde que el `stopAt` que ya tenía la voz.
+- Una **segunda** petición de parada sobre una voz que ya se apaga corta en seco
+  (`SECOND_STOP_SEC`). Sin eso, insistir con el pánico reiniciaba el fundido
+  desde el volumen del momento y alejaba el silencio. Apretar el pánico dos
+  veces es la salida de emergencia.
+
+### 14. El fundido se piensa en segundos
 
 Va de 0 a 15 s y en la interfaz es un deslizador en segundos, no un número en
 milisegundos: en ms nadie sabe si 2500 es mucho o poco para apagar un ambiente.
 Se aplica cuando otro pad exclusivo lo corta, cuando el operador lo para desde su
-propio pad o desde la franja "Sonando", y con el pánico. Sólo el retiro de un
-disparo accidental lo ignora (ver gotcha 5).
+propio pad o desde la franja "Sonando", y con el pánico — siempre acotado por el
+gotcha 13. Sólo el retiro de un disparo accidental lo ignora (ver gotcha 5).
 
-### 14. iOS suspende el audio con la pantalla bloqueada
+### 15. iOS suspende el audio con la pantalla bloqueada
 
 En PWA instalada, iOS suspende el `AudioContext` al bloquear la pantalla o pasar
 a segundo plano. Mitigación: Screen Wake Lock mientras el tablero está abierto, y
@@ -228,6 +246,13 @@ apuntando a un centinela muerto y la pantalla se apaga sola a partir de ahí.
 ---
 
 ## Verificación
+
+> `npm run lint` sólo comprueba tipos de verdad desde que se agregó
+> `@types/react`. Sin esos tipos, JSX quedaba sin tipar: las props de los
+> componentes no se verificaban y una clave de traducción inexistente compilaba
+> igual (así llegaron a producción cinco claves que renderizaban `undefined`,
+> entre ellas el `aria-label` del botón de compartir). Si alguien las quita, el
+> `lint` vuelve a dar verde sin comprobar nada.
 
 ```bash
 npm run lint                    # tsc --noEmit

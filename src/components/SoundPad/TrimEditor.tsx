@@ -93,7 +93,9 @@ export const TrimEditor: React.FC<TrimEditorProps> = ({
   }, [peaks, width, startSec, endSec, total]);
 
   if (!buffer) {
-    return <p className="text-[10px] text-zinc-400">…</p>;
+    return (
+      <p className="text-[10px] text-zinc-500" role="status">{t.soundpadLoadingAudio}</p>
+    );
   }
 
   const setStart = (sec: number) => {

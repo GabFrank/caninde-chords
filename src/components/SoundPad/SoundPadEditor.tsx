@@ -10,7 +10,7 @@ import { MAX_REPEAT, MAX_FADE_MS, soundpadEngine } from '../../services/soundpad
 import { TrimEditor } from './TrimEditor';
 import { midiService, midiNoteName } from '../../services/midi';
 import {
-  DEFAULT_COLOR_ID, DEFAULT_ICON_ID, SOUNDPAD_COLORS, SOUNDPAD_ICONS, UNCATEGORIZED_ID, padIcon,
+  DEFAULT_COLOR_ID, DEFAULT_ICON_ID, SOUNDPAD_COLORS, SOUNDPAD_ICONS, UNCATEGORIZED_ID, padIcon, iconLabel,
 } from '../../lib/soundpadStyles';
 import { PadDraft } from './useSoundpad';
 
@@ -30,6 +30,7 @@ interface SoundPadEditorProps {
   onStopPreview: (pad: SoundPad) => void;
   previewing: boolean;
   t: Strings;
+  lang: 'es' | 'en';
 }
 
 const emptyDraft = {
@@ -49,7 +50,7 @@ const emptyDraft = {
 
 export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
   open, pad, categories, missing, onClose, onCreate, onUpdate, onDelete,
-  onPreview, onStopPreview, previewing, t,
+  onPreview, onStopPreview, previewing, t, lang,
 }) => {
   const [draft, setDraft] = useState({ ...emptyDraft });
   const [file, setFile] = useState<File | null>(null);
@@ -61,7 +62,9 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    // Al cerrar también: si no, "Aprender" quedaba escuchando y la próxima nota
+    // del controlador escribía en el formulario de un modal invisible.
+    if (!open) { setLearning(false); return; }
     setFile(null);
     setConfirmDelete(false);
     setFormError(null);
@@ -220,7 +223,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
                   key={id}
                   type="button"
                   onClick={() => setDraft(d => ({ ...d, icon: id }))}
-                  aria-label={id}
+                  aria-label={iconLabel(id, lang)}
                   aria-pressed={draft.icon === id}
                   className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors ${draft.icon === id ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:text-blue-600'}`}
                 >
@@ -310,6 +313,12 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
           />
           <p className="text-[10px] text-zinc-500 leading-relaxed">{t.soundpadFadeHint}</p>
         </div>
+
+        {/* Al dar de alta todavía no hay archivo guardado que recortar; decirlo
+            es mejor que un hueco sin explicación. */}
+        {!pad && (
+          <p className="text-[10px] text-zinc-500 leading-relaxed">{t.soundpadTrimAfterSave}</p>
+        )}
 
         {/* Recorte: sólo con el audio disponible en este dispositivo. */}
         {pad && !missing && (

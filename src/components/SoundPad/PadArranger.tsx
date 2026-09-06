@@ -71,18 +71,20 @@ const ArrangerItem: React.FC<{
         <p className="text-[10px] text-zinc-500 truncate">{formatDuration(pad.durationMs)}</p>
       </div>
 
-      {/* Alternativa al arrastre: en táctil es lo único fiable, y con teclado es
-          lo único que existe. */}
-      <div className="flex flex-col shrink-0">
+      {/* Alternativa al arrastre: en táctil es lo único fiable —el asa está
+          oculta por debajo de `sm`— y con teclado es lo único que existe. Por
+          eso miden 44px y van una al lado de la otra: apiladas, con 24px cada
+          una, bajar un pad y subirlo estaban a tres píxeles de distancia. */}
+      <div className="flex shrink-0 gap-0.5">
         <button
           type="button"
           onClick={() => onMove(pad.id, -1)}
           disabled={index === 0}
           data-move-up={pad.id}
           aria-label={`${t.moveUp}: ${pad.name}`}
-          className="w-11 h-6 flex items-center justify-center text-zinc-400 hover:text-blue-500 disabled:opacity-25 rounded-lg transition-all"
+          className="w-11 h-11 flex items-center justify-center text-zinc-500 hover:text-blue-500 disabled:opacity-25 rounded-lg transition-all"
         >
-          <ChevronUp size={18} />
+          <ChevronUp size={20} />
         </button>
         <button
           type="button"
@@ -90,9 +92,9 @@ const ArrangerItem: React.FC<{
           disabled={index === total - 1}
           data-move-down={pad.id}
           aria-label={`${t.moveDown}: ${pad.name}`}
-          className="w-11 h-6 flex items-center justify-center text-zinc-400 hover:text-blue-500 disabled:opacity-25 rounded-lg transition-all"
+          className="w-11 h-11 flex items-center justify-center text-zinc-500 hover:text-blue-500 disabled:opacity-25 rounded-lg transition-all"
         >
-          <ChevronDown size={18} />
+          <ChevronDown size={20} />
         </button>
       </div>
     </Reorder.Item>
@@ -102,6 +104,8 @@ const ArrangerItem: React.FC<{
 export const PadArranger: React.FC<PadArrangerProps> = ({ pads, onSave, onCancel, t }) => {
   const [ids, setIds] = useState<string[]>(() => pads.map(p => p.id));
   const [saving, setSaving] = useState(false);
+  const [confirmarDescarte, setConfirmarDescarte] = useState(false);
+  const original = useRef<string[]>(pads.map(p => p.id));
   const byId = new Map(pads.map(p => [p.id, p]));
 
   // Si mientras se organiza llega un pad nuevo desde otro dispositivo, la lista
@@ -136,28 +140,38 @@ export const PadArranger: React.FC<PadArrangerProps> = ({ pads, onSave, onCancel
   };
 
   const ordered = ids.map(id => byId.get(id)).filter(Boolean) as SoundPad[];
+  const hayCambios = ids.join('|') !== original.current.join('|');
+
+  const cancelar = () => {
+    // Descartar sin avisar el trabajo de acomodar catorce sonidos, con el botón
+    // pegado al de guardar, es demasiado fácil y no hay deshacer.
+    if (hayCambios && !confirmarDescarte) { setConfirmarDescarte(true); return; }
+    onCancel();
+  };
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 p-2 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
-        <p className="flex-1 text-[11px] text-blue-700 dark:text-blue-300 leading-relaxed">
-          {t.soundpadArrangeHint}
+      {/* Pegajosa: en una lista larga —o en apaisado— "Listo" se iba de pantalla
+          y había que subir todo para guardar. */}
+      <div className="sticky top-0 z-10 flex items-center gap-3 p-2 rounded-xl bg-blue-50 dark:bg-blue-950/95 border border-blue-200 dark:border-blue-900 backdrop-blur">
+        <p className="flex-1 min-w-0 text-[11px] text-blue-700 dark:text-blue-300 leading-relaxed">
+          {confirmarDescarte ? t.soundpadArrangeDiscard : t.soundpadArrangeHint}
         </p>
         <button
           type="button"
-          onClick={onCancel}
-          className="min-h-9 px-3 rounded-lg bg-white dark:bg-zinc-900 text-[11px] font-bold shrink-0"
+          onClick={cancelar}
+          className={`min-h-11 px-3 rounded-lg text-[11px] font-bold shrink-0 ${confirmarDescarte ? 'bg-red-600 text-white' : 'bg-white dark:bg-zinc-900'}`}
         >
-          {t.cancel}
+          {confirmarDescarte ? t.delete : t.cancel}
         </button>
         <button
           type="button"
-          onClick={save}
+          onClick={() => (confirmarDescarte ? setConfirmarDescarte(false) : save())}
           disabled={saving}
-          className="min-h-9 px-3 rounded-lg bg-blue-600 text-white text-[11px] font-black flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+          className="min-h-11 px-3 rounded-lg bg-blue-600 text-white text-[11px] font-black flex items-center gap-1.5 shrink-0 disabled:opacity-50"
         >
           <Check size={13} />
-          {t.soundpadArrangeDone}
+          {confirmarDescarte ? t.cancel : t.soundpadArrangeDone}
         </button>
       </div>
 

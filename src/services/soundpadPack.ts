@@ -13,6 +13,7 @@
 import JSZip from 'jszip';
 import { SoundCategory, SoundPad } from '../types';
 import { getSound, putSound } from './soundLibrary';
+import { MAX_FADE_MS } from './soundpadEngine';
 
 const MANIFEST = 'soundpad.json';
 const AUDIO_DIR = 'audio/';
@@ -81,25 +82,11 @@ export async function exportPack(pads: SoundPad[], categories: SoundCategory[]):
     const blob = await getSound(pad.fileKey);
     if (!blob) continue;
     folder.file(pad.fileKey, await zipPayload(blob));
-    included.push({
-      name: pad.name,
-      categoryId: pad.categoryId,
-      color: pad.color,
-      icon: pad.icon,
-      fileKey: pad.fileKey,
-      fileName: pad.fileName,
-      fileSize: pad.fileSize,
-      durationMs: pad.durationMs,
-      volume: pad.volume,
-      repeat: pad.repeat,
-      overlay: pad.overlay,
-      fadeOutMs: pad.fadeOutMs,
-      trimStartMs: pad.trimStartMs,
-      trimEndMs: pad.trimEndMs,
-      midiNote: pad.midiNote,
-      favorite: pad.favorite,
-      order: pad.order ?? 0,
-    });
+    // Se saneja al exportar con la misma función que al importar: así el
+    // manifiesto nunca lleva claves con valor `undefined` ni valores fuera de
+    // rango, y lo que se escribe es exactamente lo que se sabe leer.
+    const limpio = sanitizePackPad({ ...pad, order: pad.order ?? 0 });
+    if (limpio) included.push(limpio);
   }
 
   const manifest: PackManifest = {
@@ -142,28 +129,36 @@ function sanitizePackPad(raw: unknown): PackPad | null {
   const p = raw as Record<string, unknown>;
   if (typeof p.fileKey !== 'string' || !p.fileKey) return null;
   const name = typeof p.name === 'string' && p.name.trim() ? p.name.trim().slice(0, 59) : 'Sin nombre';
+
+  // Los campos opcionales se OMITEN cuando no vienen, en vez de quedar con
+  // valor `undefined`. Firestore rechaza los `undefined` lanzando de forma
+  // síncrona, así que una sola clave así cortaba la importación entera.
+  const opcionales: Partial<PackPad> = {};
+  const poner = <K extends keyof PackPad>(k: K, v: PackPad[K] | undefined) => {
+    if (v !== undefined) opcionales[k] = v;
+  };
+  poner('color', typeof p.color === 'string' ? p.color.slice(0, 23) : undefined);
+  poner('icon', typeof p.icon === 'string' ? p.icon.slice(0, 23) : undefined);
+  poner('durationMs', optNum(p.durationMs, 0, Number.MAX_SAFE_INTEGER));
+  poner('trimStartMs', optNum(p.trimStartMs, 0, 24 * 3600_000));
+  poner('trimEndMs', optNum(p.trimEndMs, 0, 24 * 3600_000));
+  poner('midiNote', optNum(p.midiNote, 0, 127));
+
   return {
     name,
     categoryId: isSafeId(p.categoryId) ? p.categoryId : 'uncategorized',
-    color: typeof p.color === 'string' ? p.color.slice(0, 23) : undefined,
-    icon: typeof p.icon === 'string' ? p.icon.slice(0, 23) : undefined,
     fileKey: p.fileKey.slice(0, 199),
     fileName: typeof p.fileName === 'string' ? p.fileName.slice(0, 199) : name,
     fileSize: num(p.fileSize, 0, 0, Number.MAX_SAFE_INTEGER),
-    durationMs: typeof p.durationMs === 'number' && Number.isFinite(p.durationMs) ? p.durationMs : undefined,
     volume: num(p.volume, 0.85, 0, 1),
     // Entero: `repeat: 0.5` daría un `stop()` en el mismo instante del `start()`
     // y el pad no sonaría nunca.
     repeat: Math.round(num(p.repeat, 1, 0, 50)),
     overlay: typeof p.overlay === 'boolean' ? p.overlay : true,
-    fadeOutMs: num(p.fadeOutMs, 120, 0, 15000),
-    // El recorte queda `undefined` si no venía: `num` con un valor por defecto
-    // inventaría marcas que el pack no traía.
-    trimStartMs: optNum(p.trimStartMs, 0, 24 * 3600_000),
-    trimEndMs: optNum(p.trimEndMs, 0, 24 * 3600_000),
-    midiNote: optNum(p.midiNote, 0, 127),
+    fadeOutMs: num(p.fadeOutMs, 120, 0, MAX_FADE_MS),
     favorite: p.favorite === true,
     order: num(p.order, 0, 0, Number.MAX_SAFE_INTEGER),
+    ...opcionales,
   };
 }
 

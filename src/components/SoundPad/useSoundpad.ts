@@ -23,6 +23,19 @@ import { reassignOrder } from '../../lib/padOrder';
 export type PadDraft = Omit<SoundPad, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'>;
 
 /**
+ * Quita las claves cuyo valor es `undefined`.
+ *
+ * Firestore las rechaza, y lo hace LANZANDO DE FORMA SÍNCRONA: un `.catch()` en
+ * la promesa no las atrapa, así que un solo campo opcional ausente cortaba el
+ * bucle entero de la importación y no se creaba ninguna ficha.
+ */
+function sinUndefined<T extends Record<string, unknown>>(obj: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) if (v !== undefined) out[k] = v;
+  return out as T;
+}
+
+/**
  * Deja el fallo de Firestore diagnosticado como manda AGENTS.md y además lo pone
  * en pantalla.
  *
@@ -176,8 +189,8 @@ export function useSoundpad() {
       throw e;
     }
     const durationMs = await readDurationMs(file);
-    addDoc(collection(db, 'soundPads'), {
-      name: (draft.name || file.name.replace(/\.[^.]+$/, '')).slice(0, 59),
+    addDoc(collection(db, 'soundPads'), sinUndefined({
+      name: padName(draft.name || file.name.replace(/\.[^.]+$/, '')),
       categoryId: draft.categoryId || UNCATEGORIZED_ID,
       color: draft.color ?? DEFAULT_COLOR_ID,
       icon: draft.icon ?? DEFAULT_ICON_ID,
@@ -189,12 +202,17 @@ export function useSoundpad() {
       repeat: draft.repeat ?? 1,
       overlay: draft.overlay ?? true,
       fadeOutMs: draft.fadeOutMs ?? 120,
+      // Estos tres se estaban perdiendo: el operador aprendía la nota del pedal
+      // al dar de alta, guardaba, y el pad nacía sin ella y sin ningún aviso.
+      midiNote: draft.midiNote,
+      trimStartMs: draft.trimStartMs,
+      trimEndMs: draft.trimEndMs,
       favorite: draft.favorite ?? false,
       order: nextOrder(),
       ownerId: user.uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }).catch(e => reportFirestore(e, OperationType.CREATE, 'soundPads', setError));
+    })).catch(e => reportFirestore(e, OperationType.CREATE, 'soundPads', setError));
   }, [user]);
 
   /**
@@ -374,23 +392,37 @@ export function useSoundpad() {
       soundpadEngine.forget(k);
     });
 
+    // Cada ficha va en su propio try: Firestore valida de forma síncrona, así
+    // que un solo documento mal formado abortaba el bucle y dejaba los audios
+    // escritos sin ninguna ficha que los referenciara — y al recargar,
+    // `pruneOrphans` los borraba a todos.
     result.newCategories.forEach(c => {
-      setDoc(doc(db, 'soundCategories', c.id), {
-        name: c.name,
-        color: c.color,
-        order: c.order,
-        ownerId: user.uid,
-        createdAt: serverTimestamp(),
-      }).catch(e => reportFirestore(e, OperationType.CREATE, `soundCategories/${c.id}`, setError));
+      try {
+        setDoc(doc(db, 'soundCategories', c.id), sinUndefined({
+          name: c.name,
+          color: c.color,
+          order: c.order,
+          ownerId: user.uid,
+          createdAt: serverTimestamp(),
+        })).catch(e => reportFirestore(e, OperationType.CREATE, `soundCategories/${c.id}`, setError));
+      } catch (e) {
+        reportFirestore(e, OperationType.CREATE, `soundCategories/${c.id}`, setError);
+      }
     });
 
+    let creados = 0;
     result.newPads.forEach(p => {
-      addDoc(collection(db, 'soundPads'), {
-        ...p,
-        ownerId: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }).catch(e => reportFirestore(e, OperationType.CREATE, 'soundPads', setError));
+      try {
+        addDoc(collection(db, 'soundPads'), sinUndefined({
+          ...p,
+          ownerId: user.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })).catch(e => reportFirestore(e, OperationType.CREATE, 'soundPads', setError));
+        creados++;
+      } catch (e) {
+        reportFirestore(e, OperationType.CREATE, 'soundPads', setError);
+      }
     });
 
     // El estado de "falta el audio" se RECALCULA contra lo que hay realmente en
@@ -401,7 +433,7 @@ export function useSoundpad() {
     const { missing } = await soundpadEngine.preload(pads);
     setMissingIds(new Set(missing));
 
-    return { audios: result.audios, created: result.newPads.length };
+    return { audios: result.audios, created: creados };
   }, [user, pads, categories]);
 
   const refreshUsage = useCallback(() => {

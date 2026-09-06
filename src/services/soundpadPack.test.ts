@@ -71,6 +71,33 @@ describe('pack de sonidos', () => {
     expect(newCategories).toEqual([]);
   });
 
+  it('las fichas del pack no llevan ninguna clave con valor undefined', async () => {
+    // Firestore rechaza los `undefined` LANZANDO de forma síncrona, así que un
+    // solo campo opcional ausente cortaba la importación entera: cero fichas
+    // creadas, y al recargar `pruneOrphans` borraba los audios recién escritos.
+    // Un pad sin recorte y sin nota MIDI —o sea, casi cualquiera— los traía.
+    const zip = await exportPack([pad({ durationMs: undefined })], []);
+    const { newPads } = await importPack(zip, vacio);
+
+    const conUndefined = Object.entries(newPads[0])
+      .filter(([, v]) => v === undefined)
+      .map(([k]) => k);
+    expect(conUndefined).toEqual([]);
+  });
+
+  it('el recorte y la nota MIDI viajan en el pack', async () => {
+    const zip = await exportPack([pad({ trimStartMs: 250, trimEndMs: 900, midiNote: 36 })], []);
+    const { newPads } = await importPack(zip, vacio);
+    expect(newPads[0]).toMatchObject({ trimStartMs: 250, trimEndMs: 900, midiNote: 36 });
+  });
+
+  it('acota el fundido al techo que aceptan las reglas', async () => {
+    // Un pack con un fundido disparatado daba permission-denied en producción.
+    const zip = await exportPack([pad({ fadeOutMs: 999999 })], []);
+    const { newPads } = await importPack(zip, vacio);
+    expect(newPads[0].fadeOutMs).toBe(15000);
+  });
+
   it('rechaza un zip que no sea un pack', async () => {
     const { default: JSZip } = await import('jszip');
     const otro = new JSZip();

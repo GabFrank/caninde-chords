@@ -105,6 +105,14 @@ const idsDePads = () => page.evaluate(() =>
  * es configurable por sonido y un ambiente con 2 s de apagado sigue sonando —
  * correctamente— mucho después de tocar el pánico.
  */
+/** Toca el pánico si hay algo que parar. Sin la guarda, un sonido que ya
+ *  terminó solo dejaba la prueba esperando un botón deshabilitado. */
+async function pararTodo() {
+  const b = page.getByRole('button', { name: /PARAR TODO|STOP ALL/ });
+  if (!(await b.isDisabled())) await b.click();
+  return esperarSilencio();
+}
+
 async function esperarSilencio(ms = 6000) {
   const hasta = Date.now() + ms;
   while (Date.now() < hasta) {
@@ -168,8 +176,7 @@ if (padVisible) {
   check('el pad se marca como activo', activos === 1, `activos: ${activos}`);
 
   // Pánico
-  await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
-  await page.waitForTimeout(600);
+  await pararTodo();
   check('el pánico deja de mostrar voces', await fichasDeVoz() === 0);
 
   // Persistencia del audio en IndexedDB
@@ -186,7 +193,7 @@ if (padVisible) {
   check('el audio quedó guardado en IndexedDB', stored === 1, `claves: ${stored}`);
 
   // Favorito
-  await page.getByRole('button', { name: /^Favorito$|^Favorite$/ }).first().click();
+  await page.getByRole('button', { name: /^(Favorito|Favorite):/ }).first().click();
   await page.waitForTimeout(500);
   await page.getByRole('button', { name: /Favoritos|Favorites/ }).first().click();
   await page.waitForTimeout(300);
@@ -239,7 +246,7 @@ await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
 await page.waitForTimeout(1000);
 
 await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
-  .getByRole('button', { name: /Editar|Edit/ }).click();
+  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
 await page.waitForTimeout(400);
 check('el volumen del pad se guardó', await page.locator('#pad-volume').inputValue() === '0.4',
   `valor: ${await page.locator('#pad-volume').inputValue()}`);
@@ -249,10 +256,20 @@ await page.waitForTimeout(300);
 
 // ── Recorte no destructivo y fundido ────────────────────────────────────────
 await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
-  .getByRole('button', { name: /Editar|Edit/ }).click();
+  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
 await page.waitForTimeout(700);
-check('el recortador dibuja la forma de onda',
-  await page.getByRole('img', { name: /Forma de onda|Waveform/ }).count() === 1);
+const tintaEnLaOnda = await page.evaluate(() => {
+  const c = document.querySelector('canvas');
+  if (!c) return -1;
+  const g = c.getContext('2d');
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+  return n;
+});
+// Se miran los píxeles: comprobar que el canvas existe pasaba igual con el
+// dibujo desactivado.
+check('el recortador dibuja la forma de onda', tintaEnLaOnda > 1000, `píxeles: ${tintaEnLaOnda}`);
 
 // El WAV de prueba dura 1 s: se recorta a la mitad del medio.
 await page.locator('#trim-start').fill('0.25');
@@ -262,7 +279,7 @@ await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
 await page.waitForTimeout(1000);
 
 await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
-  .getByRole('button', { name: /Editar|Edit/ }).click();
+  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
 await page.waitForTimeout(700);
 check('el recorte se guardó', await page.locator('#trim-start').inputValue() === '0.25'
   && await page.locator('#trim-end').inputValue() === '0.75',
@@ -275,10 +292,39 @@ await page.waitForTimeout(300);
 await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
 await page.waitForTimeout(1200);
 await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
-  .getByRole('button', { name: /Editar|Edit/ }).click();
+  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
 await page.waitForTimeout(900);
 const inicio = await page.locator('#trim-start').inputValue();
 check('reemplazar el archivo borra el recorte viejo', inicio === '0', `empieza en ${inicio}`);
+await page.getByRole('button', { name: /^Cerrar$/ }).click();
+await page.waitForTimeout(400);
+
+// El recorte se guarda y se relee. Que el recorte afecte de verdad al AUDIO lo
+// cubren las pruebas unitarias del motor (`start(cuándo, desde, cuánto)` sin
+// bucle y `loopStart`/`loopEnd` con bucle), que fallan si se lo ignora. Medirlo
+// acá por el tiempo que el pad figura como sonando resultó poco fiable: el
+// contador de la pantalla no distingue qué voz sigue viva.
+await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
+await page.waitForTimeout(300);
+await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
+await page.waitForTimeout(200);
+await page.locator('#pad-name').fill('Recortado');
+await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
+await page.waitForTimeout(1000);
+
+await page.locator('[data-pad-id]').filter({ hasText: 'Recortado' }).locator('..')
+  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await page.waitForTimeout(800);
+await page.locator('#trim-start').fill('0.25');
+await page.locator('#trim-end').fill('0.75');
+await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
+await page.waitForTimeout(1200);
+
+await page.locator('[data-pad-id]').filter({ hasText: 'Recortado' }).locator('..')
+  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await page.waitForTimeout(800);
+const guardado = `${await page.locator('#trim-start').inputValue()}-${await page.locator('#trim-end').inputValue()}`;
+check('el recorte de un pad nuevo se guarda y se relee', guardado === '0.25-0.75', guardado);
 await page.getByRole('button', { name: /^Cerrar$/ }).click();
 await page.waitForTimeout(400);
 
@@ -295,7 +341,7 @@ check('la categoría no aparece como filtro mientras esté vacía',
   await page.getByRole('button', { name: /^Naturaleza / }).count() === 0);
 
 await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
-  .getByRole('button', { name: /Editar|Edit/ }).click();
+  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
 await page.waitForTimeout(400);
 await page.locator('#pad-category').selectOption({ label: 'Naturaleza' });
 await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
@@ -418,16 +464,16 @@ await page.waitForTimeout(400);
 const yDurante = (await page.locator('[data-pad-id]').first().boundingBox()).y;
 check('la grilla no se mueve al empezar a sonar', Math.abs(yDurante - yAntes) < 2,
   `se movió ${Math.round(yDurante - yAntes)}px`);
-await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
-await esperarSilencio();
+await pararTodo();
 
 // (c) Los pads tienen que responder al teclado (pedal, teclado numérico, lector).
-await page.locator('[data-pad-id]').first().focus();
+// Se usa un pad EN BUCLE y se mira enseguida: con un pad recortado de medio
+// segundo, esperar medio segundo antes de comprobar lo encontraba ya callado.
+await page.getByRole('button', { name: /^Lluvia/ }).first().focus();
 await page.keyboard.press('Enter');
-await page.waitForTimeout(500);
-check('un pad enfocado se dispara con Enter', await countPlaying() === 1, `activos: ${await countPlaying()}`);
-await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
-await esperarSilencio();
+await page.waitForTimeout(250);
+check('un pad enfocado se dispara con Enter', await countPlaying() >= 1, `activos: ${await countPlaying()}`);
+await pararTodo();
 
 // (c2) Atajos globales: las teclas 1-9 disparan por posición, Escape es el pánico.
 await page.locator('body').click({ position: { x: 5, y: 5 } });
@@ -442,20 +488,48 @@ check('la tecla 2 dispara el segundo pad de la pantalla',
 await page.keyboard.press('Escape');
 check('Escape para todo', await esperarSilencio());
 
-// Escribiendo en un campo, los números no pueden disparar nada.
-await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
-await page.waitForTimeout(400);
-await page.locator('#pad-name').fill('Trueno 3');
+// El guardia de escritura se ejercita en el BUSCADOR, no en un campo del
+// editor: dentro de un modal el atajo se descarta antes de llegar al guardia,
+// así que ahí la comprobación pasaba con el guardia eliminado.
+const buscador = page.locator('input[type=text], input:not([type])').first();
+await buscador.fill('n');            // deja varios pads a la vista
+await buscador.focus();
+await page.keyboard.press('1');      // con el guardia roto, dispararía el pad 1
+await page.waitForTimeout(600);
+check('escribir un número en el buscador no dispara ningún pad', await countPlaying() === 0,
+  `sonando: ${await countPlaying()}`);
+check('y el número llegó al buscador', (await buscador.inputValue()) === 'n1');
+await buscador.fill('');
 await page.waitForTimeout(300);
-check('escribir un número en un campo no dispara ningún pad', await countPlaying() === 0);
-await page.keyboard.press('Escape');
-await page.waitForTimeout(400);
-check('Escape con el modal abierto lo cierra en vez de disparar el pánico',
-  await page.locator('#pad-name').count() === 0);
 
-// La tecla asignada se ve en el pad, o no sirve de nada.
-check('el pad muestra su tecla', await page.evaluate(() =>
-  document.querySelector('[data-pad-id]')?.textContent?.includes('1') ?? false));
+// Escape con un modal abierto: se usa un pad EN BUCLE y se espera más que
+// cualquier fundido, para que un pánico indebido no pueda pasar desapercibido.
+await page.getByRole('button', { name: /^Lluvia/ }).first().dispatchEvent('pointerdown');
+await page.waitForTimeout(400);
+await page.locator('[data-pad-id]').filter({ hasText: 'Lluvia' }).locator('..')
+  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await page.waitForTimeout(400);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(1500);
+check('Escape con el modal abierto lo cierra SIN disparar el pánico',
+  await page.locator('#pad-name').count() === 0 && await countPlaying() === 1,
+  `sonando: ${await countPlaying()}`);
+
+// El pánico tiene que funcionar aunque el foco esté en un deslizador: es lo
+// último que toca el operador antes de necesitarlo. Se comprueba DÓNDE quedó el
+// foco: sin eso, si `focus()` no prendiera, la tecla iría al body y la
+// comprobación pasaría sin ejercitar nada.
+await page.locator('input[type=range]').first().click();
+const focoEnDeslizador = await page.evaluate(() => {
+  const el = document.activeElement;
+  return el?.tagName === 'INPUT' && el.getAttribute('type') === 'range';
+});
+check('el foco queda en el deslizador', focoEnDeslizador);
+await page.keyboard.press('Escape');
+check('el pánico funciona con el foco en un deslizador', await esperarSilencio());
+
+check('el pad muestra la tecla que lo dispara', await page.evaluate(() =>
+  document.querySelector('[data-pad-id] [data-shortcut="1"]') !== null));
 
 // (d) Un bucle no puede quedar sonando fuera del control de la interfaz.
 // El motor sobrevive al desmontaje del tablero: al volver de otra pestaña, la
@@ -484,6 +558,33 @@ const sinNombre = await page.evaluate(() => {
 check('ningún botón visible queda sin nombre a 390px', sinNombre === 0, `sin nombre: ${sinNombre}`);
 check('no hay desbordamiento horizontal a 390px',
   await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+
+// El modo Organizar en teléfono: sus flechas son la ÚNICA forma de reordenar
+// ahí (el asa de arrastre está oculta por debajo de `sm`).
+await page.getByRole('button', { name: /^(Organizar|Arrange)$/ }).click();
+await page.waitForTimeout(500);
+const flechas = await page.evaluate(() =>
+  [...document.querySelectorAll('[data-move-up],[data-move-down]')].map(b => {
+    const r = b.getBoundingClientRect();
+    return { w: Math.round(r.width), h: Math.round(r.height), nombre: b.getAttribute('aria-label') || '' };
+  }));
+check('las flechas de organizar son alcanzables con el dedo',
+  flechas.length > 0 && flechas.every(f => f.w >= 40 && f.h >= 40),
+  JSON.stringify(flechas[0]));
+check('y todas tienen nombre accesible', flechas.every(f => f.nombre.length > 0));
+
+const botonesOrganizar = await page.evaluate(() => {
+  const visible = (el) => el.getBoundingClientRect().width > 0;
+  return [...document.querySelectorAll('button')]
+    .filter(b => visible(b) && !b.getAttribute('aria-label') && !b.textContent.trim()).length;
+});
+check('ningún botón sin nombre en modo Organizar', botonesOrganizar === 0, `sin nombre: ${botonesOrganizar}`);
+check('el botón de guardar el orden se ve sin desplazarse', await page.evaluate(() => {
+  const b = [...document.querySelectorAll('button')].find(x => /Listo|Done/.test(x.textContent || ''));
+  if (!b) return false;
+  const r = b.getBoundingClientRect();
+  return r.top >= 0 && r.bottom <= window.innerHeight;
+}));
 
 check('sin errores de JavaScript', errs.length === 0, errs.join(' | '));
 

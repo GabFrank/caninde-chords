@@ -43,10 +43,12 @@ export function isMidiSupported(): boolean {
 }
 
 type NoteListener = (note: MidiNote) => void;
+type DevicesListener = (names: string[]) => void;
 
 class MidiService {
   private access: MIDIAccess | null = null;
   private listeners = new Set<NoteListener>();
+  private deviceListeners = new Set<DevicesListener>();
   private enabling: Promise<boolean> | null = null;
 
   /** Pide el permiso y engancha las entradas. Idempotente. */
@@ -60,7 +62,8 @@ class MidiService {
         this.access = access;
         this.attachAll();
         // Enchufar el controlador con la app abierta tiene que funcionar.
-        access.onstatechange = () => this.attachAll();
+        access.onstatechange = () => { this.attachAll(); this.notifyDevices(); };
+        this.notifyDevices();
         return true;
       })
       .catch(e => {
@@ -95,6 +98,26 @@ class MidiService {
   deviceNames(): string[] {
     if (!this.access) return [];
     return [...this.access.inputs.values()].map(i => i.name || 'MIDI');
+  }
+
+  private notifyDevices() {
+    const nombres = this.deviceNames();
+    this.deviceListeners.forEach(l => {
+      try { l(nombres); } catch (e) { console.error('Listener de dispositivos MIDI falló', e); }
+    });
+  }
+
+  /**
+   * Escucha los cambios en los controladores conectados, y recibe la lista
+   * ACTUAL al suscribirse.
+   *
+   * Sin la entrega inicial, volver de otra pestaña dejaba la interfaz diciendo
+   * "no se detectó ningún controlador" con el pedal enchufado y funcionando.
+   */
+  subscribeDevices(listener: DevicesListener): () => void {
+    this.deviceListeners.add(listener);
+    try { listener(this.deviceNames()); } catch (e) { console.error('Listener de dispositivos MIDI falló', e); }
+    return () => { this.deviceListeners.delete(listener); };
   }
 
   /** Escucha las notas. Devuelve la función para dejar de escuchar. */

@@ -114,19 +114,31 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
     });
   }, [sp.pads, filter, search]);
 
+  /** Tecla de cada pad. Con `indexOf` dentro del render esto era O(n²). */
+  const teclaDe = useMemo(() => {
+    const m = new Map<string, string>();
+    visiblePads.forEach((p, i) => {
+      const k = shortcutKeyFor(i);
+      if (k) m.set(p.id, k);
+    });
+    return m;
+  }, [visiblePads]);
+
   // Lo que se dispara por atajo o por MIDI se lee de una referencia y no de una
   // dependencia del efecto: si no, cada cambio en la lista de pads —o cada
   // cuadro del progreso— desmontaría y volvería a montar el listener global.
   const liveRef = useRef({ pads: visiblePads, play: sp.playPad, panic: sp.stopAll, arranging });
-  liveRef.current = { pads: visiblePads, play: sp.playPad, panic: sp.stopAll, arranging };
+  useEffect(() => {
+    liveRef.current = { pads: visiblePads, play: sp.playPad, panic: sp.stopAll, arranging };
+  });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const { pads, play, panic, arranging: organizando } = liveRef.current;
-      if (organizando) return;
-      // Con un modal abierto, Escape le pertenece al modal.
+      // Con un modal abierto, Escape le pertenece al modal. El pánico sí
+      // funciona mientras se organiza: es el reflejo entrenado del operador.
       const modalOpen = Boolean(document.querySelector('[data-overlay]'));
-      const action = resolveShortcut(e, { modalOpen });
+      const action = resolveShortcut(e, { modalOpen, arranging: organizando });
       if (!action) return;
       e.preventDefault();
       if (action.kind === 'panic') { panic(); return; }
@@ -144,9 +156,19 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
     if (!midiOn) return;
     return midiService.subscribe(({ note }) => {
       if (liveRef.current.arranging) return;
+      // Con un modal abierto tampoco: enseñarle una nota al pad con "Aprender"
+      // hacía sonar a todo volumen el pad que ya la tenía asignada.
+      if (document.querySelector('[data-overlay]')) return;
       const pad = liveRef.current.pads.find(p => p.midiNote === note);
       if (pad) liveRef.current.play(pad);
     });
+  }, [midiOn]);
+
+  // La lista de controladores se mantiene al día sola: enchufar el pedal con la
+  // app abierta, o volver de otra pestaña, tienen que reflejarse.
+  useEffect(() => {
+    if (!midiOn) return;
+    return midiService.subscribeDevices(setMidiDevices);
   }, [midiOn]);
 
   const enableMidi = async () => {
@@ -154,7 +176,6 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
     const ok = await midiService.enable();
     if (!ok) { setMidiError(t.soundpadMidiDenied); return; }
     setMidiOn(true);
-    setMidiDevices(midiService.deviceNames());
   };
 
   /**
@@ -246,13 +267,12 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 ml-auto">
+        <div className={`flex items-center gap-1.5 ml-auto ${arranging ? 'hidden' : ''}`}>
           <button
             type="button"
             onClick={() => setArranging(true)}
             disabled={visiblePads.length < 2}
             aria-label={t.soundpadArrange}
-            title={visiblePads.length < 2 ? t.soundpadArrangeEmpty : undefined}
             className="min-h-11 min-w-11 px-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-40"
           >
             <ArrowUpDown size={14} />
@@ -355,6 +375,10 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
         )}
       </div>
 
+      {!arranging && sp.pads.length === 1 && (
+        <p className="text-[10px] text-zinc-500">{t.soundpadArrangeEmpty}</p>
+      )}
+
       {/* El tablero, o el organizador mientras se acomoda el orden. */}
       {arranging ? (
         <PadArranger
@@ -394,7 +418,7 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
               onStop={(p) => sp.stopPad(p.id)}
               onRetract={sp.retract}
               dense={isShort}
-              shortcut={shortcutKeyFor(visiblePads.indexOf(pad))}
+              shortcut={teclaDe.get(pad.id) ?? null}
               onEdit={(p) => setEditing({ open: true, pad: p })}
               onToggleFavorite={sp.toggleFavorite}
               labels={{
@@ -405,6 +429,7 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
                 overlayOff: t.soundpadOverlayOff,
                 loop: t.soundpadRepeatLoop,
                 stop: t.soundpadStop,
+                shortcut: t.soundpadShortcuts,
               }}
             />
           ))}
@@ -510,6 +535,7 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
         onStopPreview={(p) => sp.stopPad(p.id)}
         previewing={editing.pad ? playingPadIds.has(editing.pad.id) : false}
         t={t}
+        lang={lang}
       />
 
       <CategoryManager

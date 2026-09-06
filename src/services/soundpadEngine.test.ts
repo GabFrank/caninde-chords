@@ -10,7 +10,7 @@ vi.mock('./soundLibrary', () => ({
 
 import {
   SoundpadEngine, MissingAudioError, computePlayback, clampVolume,
-  resolveFadeSec, voicesToCut, DEFAULT_FADE_MS,
+  resolveFadeSec, voicesToCut, DEFAULT_FADE_MS, SECOND_STOP_SEC,
 } from './soundpadEngine';
 import { SoundPad } from '../types';
 
@@ -192,6 +192,37 @@ describe('SoundpadEngine', () => {
     await engine.play(makePad({ id: 'trueno', fileKey: 'k2', overlay: false, fadeOutMs: 50 }));
 
     expect(lluvia.stopped).toBeCloseTo(13);
+  });
+
+  it('parar NUNCA alarga el sonido, por largo que sea el fundido', async () => {
+    // El fallo medido: un pad de 6 s con 15 s de fundido, al tocar el pánico a
+    // los 0,5 s, se callaba a los 15,6 s en vez de a los 6,1. En Web Audio la
+    // última llamada a stop() manda, así que el fundido reprogramaba MÁS TARDE
+    // el stop que acotaba las repeticiones.
+    await engine.play(makePad({ repeat: 3, fadeOutMs: 15000 }));  // 3 × 2 s = 6 s
+    const src = ctx.sources[0];
+    expect(src.stopped).toBeCloseTo(6);
+
+    ctx.currentTime = 0.5;
+    engine.stopAll();
+
+    expect(src.stopped).toBeLessThanOrEqual(6);
+    expect(src.stopped).toBeGreaterThan(0.5);
+  });
+
+  it('insistir con el pánico corta en seco en vez de reiniciar el fundido', async () => {
+    // Aporreando el botón, el operador tiene que acercar el silencio, no alejarlo.
+    await engine.play(makePad({ repeat: 0, fadeOutMs: 15000 }));
+    const src = ctx.sources[0];
+
+    engine.stopAll();
+    const primerApagado = src.stopped!;
+    expect(primerApagado).toBeCloseTo(15);
+
+    ctx.currentTime = 1;
+    engine.stopAll();
+    expect(src.stopped).toBeCloseTo(1 + SECOND_STOP_SEC);
+    expect(src.stopped).toBeLessThan(primerApagado);
   });
 
   it('el pánico apaga cada voz con su propio fundido', async () => {
