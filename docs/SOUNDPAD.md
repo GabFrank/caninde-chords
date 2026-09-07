@@ -35,6 +35,35 @@ arregla revinculando el archivo o importando el pack `.zip`.
 
 ---
 
+## Dos pantallas: tocar y preparar
+
+El tablero se dedica **entero a disparar**. Crear, editar, categorías, orden,
+pack y MIDI viven en una pantalla aparte, `SoundpadSetup`, detrás del botón
+**Preparar el Soundpad**.
+
+Antes convivían. En un teléfono quedaba **un pad visible** y el resto de la
+pantalla era configuración que en vivo no se usa —y que un toque desviado en
+medio de una ceremonia podía activar.
+
+| En el tablero | En la preparación |
+| --- | --- |
+| PARAR TODO, volumen general | Agregar y editar sonidos |
+| Qué está sonando, con stop individual | Categorías |
+| Filtro por categoría y favoritos | Organizar (orden de los pads y de los atajos) |
+| Buscador, plegado detrás de la lupa | Exportar e importar el pack `.zip` |
+| La grilla de pads | Habilitar MIDI, espacio usado |
+
+La preparación **reemplaza** al tablero, no lo tapa: mientras se prepara no hace
+falta ver los pads, y no puede haber una grilla de disparo debajo de un dedo.
+Por lo mismo, los atajos de teclado y MIDI quedan inertes ahí (`arranging:
+setupOpen` en `liveRef`) — salvo el pánico, que nunca se desactiva.
+
+Marcar favorito y editar se hacen desde la lista de la preparación, no desde el
+pad: en el pad eran una estrella y un engranaje de 20px pegados a la zona de
+disparo.
+
+---
+
 ## Los archivos
 
 | Archivo | Qué hace |
@@ -45,7 +74,8 @@ arregla revinculando el archivo o importando el pack `.zip`.
 | `src/services/soundpadPack.ts` | Export e import de la biblioteca como un `.zip` |
 | `src/lib/soundpadStyles.ts` | Paleta e íconos de los pads |
 | `src/components/SoundPad/useSoundpad.ts` | Estado: Firestore + IndexedDB + motor |
-| `src/components/SoundPad/SoundpadBoard.tsx` | El tablero |
+| `src/components/SoundPad/SoundpadBoard.tsx` | El tablero: sólo disparar |
+| `src/components/SoundPad/SoundpadSetup.tsx` | La preparación: crear, editar, categorías, orden, pack, MIDI |
 | `src/components/SoundPad/SoundPadButton.tsx` | El pad |
 | `src/components/SoundPad/SoundPadEditor.tsx` | Alta y edición |
 | `src/components/SoundPad/CategoryManager.tsx` | ABM de categorías |
@@ -54,7 +84,6 @@ arregla revinculando el archivo o importando el pack `.zip`.
 | `src/lib/padShortcuts.ts` | Atajos de teclado |
 | `src/lib/padTrim.ts` | Resolución del recorte contra la duración real |
 | `src/lib/waveform.ts` | Picos de la forma de onda |
-| `src/lib/padShortcuts.ts` | Resolución de los atajos de teclado |
 | `src/components/SoundPad/TrimEditor.tsx` | El recortador visual |
 | `src/services/midi.ts` | Web MIDI: permiso, controladores y notas |
 
@@ -245,6 +274,20 @@ a segundo plano. Mitigación: Screen Wake Lock mientras el tablero está abierto
 navegador lo suelta solo, y sin escuchar su evento `release` la referencia queda
 apuntando a un centinela muerto y la pantalla se apaga sola a partir de ahí.
 
+### 16. Las pruebas de navegador corren sobre `dist/`, no sobre `src/`
+
+`npm run smoke` y `npm run soundpad` sirven la carpeta `dist/`. Tocar el código y
+correr la prueba sin compilar mide **la versión anterior** y sale en verde sobre
+cambios que ni siquiera están ahí. Pasó de verdad: se verificó un guardia de
+teclado sobre un build que no lo tenía, y la prueba lo dio por bueno dos veces
+seguidas —incluso con el guardia arrancado a propósito.
+
+`e2e/distFresco.mjs` compara el `mtime` de `dist/index.html` con el archivo más
+nuevo de `src/` y **corta la prueba** si quedó atrás. Un aviso no alcanzaba.
+
+Corolario para cualquier verificación por mutación: **romper el código a
+propósito y ver la prueba pasar no prueba nada si no se compiló en el medio.**
+
 ---
 
 ## Verificación
@@ -263,12 +306,20 @@ npm run build && npm run smoke  # interfaz en cuatro viewports
 npm run build && npm run soundpad
 ```
 
+El `npm run build` de las dos últimas líneas **no es opcional**: las pruebas
+sirven `dist/`. Correrlas sin compilar mediría el build anterior — ver el gotcha
+16, que ya es una guarda que corta la prueba.
+
 `npm run soundpad` es la prueba funcional en un navegador real, **con la red
 caída a propósito**: disparo, overlay vs exclusivo, pánico, persistencia en
 IndexedDB, ida y vuelta del pack, y las regresiones de las auditorías
 (desplazarse no dispara, la grilla no se mueve, el teclado funciona, el bucle
 sigue bajo control al volver de otra pestaña) y el modo organizar, incluido que
-el orden nuevo sobreviva a recargar la página.
+el orden nuevo sobreviva a recargar la página. También comprueba el corte entre
+tocar y preparar: que el tablero no ofrezca nada de crear ni configurar, que la
+preparación lo tenga todo y reemplace a la grilla, y que un número escapado
+mientras se prepara no dispare ningún sonido —comprobado con el pad en bucle,
+porque con uno corto la comprobación pasaba sola.
 
 Las pruebas del motor están escritas para fallar si el código se rompe: se
 verificó saboteando el overlay, las repeticiones, la deduplicación de

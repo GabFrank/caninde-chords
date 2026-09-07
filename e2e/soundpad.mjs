@@ -18,9 +18,11 @@ import { readFileSync, existsSync, statSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { createServer } from 'http';
 import { extname, join, normalize } from 'path';
+import { exigirDistFresco } from './distFresco.mjs';
 
 const ROOT = new URL('../', import.meta.url).pathname;
 const DIST = join(ROOT, 'dist');
+exigirDistFresco(ROOT, DIST);
 const CHROME = process.env.SMOKE_CHROME || undefined;
 
 /** Un tono de 1 s en WAV, generado acá para no versionar un binario. */
@@ -122,6 +124,19 @@ async function esperarSilencio(ms = 6000) {
   return false;
 }
 
+/** Entra a la pantalla de preparación (crear, editar, categorías, pack, orden). */
+async function abrirPreparacion() {
+  const b = page.getByRole('button', { name: /^(Preparar el Soundpad|Set up the Soundpad)$/ });
+  if (await b.count() > 0) await b.click();
+  await page.waitForTimeout(400);
+}
+/** Vuelve al tablero. */
+async function volverAlTablero() {
+  const b = page.getByRole('button', { name: /^(Tablero|Board)$/ });
+  if (await b.count() > 0) await b.click();
+  await page.waitForTimeout(400);
+}
+
 const results = [];
 const check = (name, ok, extra = '') => { results.push(`${ok ? '✓' : '✗'} ${name}${extra ? ' — ' + extra : ''}`); if (!ok) process.exitCode = 1; };
 
@@ -153,6 +168,7 @@ await page.getByRole('button', { name: /^Soundpad$/ }).click();
 await page.waitForTimeout(400);
 
 // Alta de un sonido
+await abrirPreparacion();
 await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
 await page.waitForTimeout(300);
 await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
@@ -161,6 +177,7 @@ await page.locator('#pad-name').fill('Trueno lejano');
 await page.locator('#pad-volume').fill('0.5');
 await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
 await page.waitForTimeout(1200);
+await volverAlTablero();
 
 const padVisible = await page.getByRole('button', { name: /Trueno lejano/ }).count() > 0;
 check('el pad aparece en el tablero tras guardar (con la red caída)', padVisible);
@@ -193,7 +210,9 @@ if (padVisible) {
   check('el audio quedó guardado en IndexedDB', stored === 1, `claves: ${stored}`);
 
   // Favorito
+  await abrirPreparacion();
   await page.getByRole('button', { name: /^(Favorito|Favorite):/ }).first().click();
+  await volverAlTablero();
   await page.waitForTimeout(500);
   await page.getByRole('button', { name: /Favoritos|Favorites/ }).first().click();
   await page.waitForTimeout(300);
@@ -202,7 +221,8 @@ if (padVisible) {
 
 // ── Overlay vs exclusivo, que es el corazón de la funcionalidad ──────────────
 async function addPad(name, { overlay, loop }) {
-  await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
+  await abrirPreparacion();
+await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
   await page.waitForTimeout(300);
   await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
   await page.waitForTimeout(200);
@@ -211,6 +231,7 @@ async function addPad(name, { overlay, loop }) {
   if (loop) await page.getByRole('button', { name: /^(En bucle hasta pararlo|Loop until stopped)$/ }).click();
   await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
   await page.waitForTimeout(900);
+await volverAlTablero();
 }
 
 await page.getByRole('button', { name: /^(Todos|All) / }).first().click();
@@ -235,6 +256,7 @@ check('un pad de una sola pasada se apaga solo al terminar', await countPlaying(
 // ── Los tres ajustes por sonido se guardan y se releen ──────────────────────
 // Overlay ya quedó cubierto arriba por su efecto audible; volumen y repeticiones
 // se comprueban por lo que el editor muestra al reabrir el pad.
+await abrirPreparacion();
 await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
 await page.waitForTimeout(300);
 await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
@@ -244,19 +266,21 @@ await page.locator('#pad-volume').fill('0.4');
 await page.locator('input[type=number]').first().fill('3');
 await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
 await page.waitForTimeout(1000);
+await volverAlTablero();
 
-await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
-  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await abrirPreparacion();
+await page.getByRole('button', { name: /^(Editar|Edit): Cuenco$/ }).click();
 await page.waitForTimeout(400);
 check('el volumen del pad se guardó', await page.locator('#pad-volume').inputValue() === '0.4',
   `valor: ${await page.locator('#pad-volume').inputValue()}`);
 check('las repeticiones se guardaron', await page.locator('input[type=number]').first().inputValue() === '3');
 await page.getByRole('button', { name: /^Cerrar$/ }).click();
 await page.waitForTimeout(300);
+await volverAlTablero();
 
 // ── Recorte no destructivo y fundido ────────────────────────────────────────
-await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
-  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await abrirPreparacion();
+await page.getByRole('button', { name: /^(Editar|Edit): Cuenco$/ }).click();
 await page.waitForTimeout(700);
 const tintaEnLaOnda = await page.evaluate(() => {
   const c = document.querySelector('canvas');
@@ -277,9 +301,10 @@ await page.locator('#trim-end').fill('0.75');
 await page.locator('#pad-fade').fill('2');
 await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
 await page.waitForTimeout(1000);
+await volverAlTablero();
 
-await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
-  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await abrirPreparacion();
+await page.getByRole('button', { name: /^(Editar|Edit): Cuenco$/ }).click();
 await page.waitForTimeout(700);
 check('el recorte se guardó', await page.locator('#trim-start').inputValue() === '0.25'
   && await page.locator('#trim-end').inputValue() === '0.75',
@@ -291,19 +316,22 @@ await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
 await page.waitForTimeout(300);
 await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
 await page.waitForTimeout(1200);
-await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
-  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await volverAlTablero();
+await abrirPreparacion();
+await page.getByRole('button', { name: /^(Editar|Edit): Cuenco$/ }).click();
 await page.waitForTimeout(900);
 const inicio = await page.locator('#trim-start').inputValue();
 check('reemplazar el archivo borra el recorte viejo', inicio === '0', `empieza en ${inicio}`);
 await page.getByRole('button', { name: /^Cerrar$/ }).click();
 await page.waitForTimeout(400);
+await volverAlTablero();
 
 // El recorte se guarda y se relee. Que el recorte afecte de verdad al AUDIO lo
 // cubren las pruebas unitarias del motor (`start(cuándo, desde, cuánto)` sin
 // bucle y `loopStart`/`loopEnd` con bucle), que fallan si se lo ignora. Medirlo
 // acá por el tiempo que el pad figura como sonando resultó poco fiable: el
 // contador de la pantalla no distingue qué voz sigue viva.
+await abrirPreparacion();
 await page.getByRole('button', { name: /Agregar sonido|Add sound/ }).first().click();
 await page.waitForTimeout(300);
 await page.locator('input[type=file][accept*="audio"]').setInputFiles(WAV);
@@ -311,24 +339,28 @@ await page.waitForTimeout(200);
 await page.locator('#pad-name').fill('Recortado');
 await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
 await page.waitForTimeout(1000);
+await volverAlTablero();
 
-await page.locator('[data-pad-id]').filter({ hasText: 'Recortado' }).locator('..')
-  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await abrirPreparacion();
+await page.getByRole('button', { name: /^(Editar|Edit): Recortado$/ }).click();
 await page.waitForTimeout(800);
 await page.locator('#trim-start').fill('0.25');
 await page.locator('#trim-end').fill('0.75');
 await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
 await page.waitForTimeout(1200);
+await volverAlTablero();
 
-await page.locator('[data-pad-id]').filter({ hasText: 'Recortado' }).locator('..')
-  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await abrirPreparacion();
+await page.getByRole('button', { name: /^(Editar|Edit): Recortado$/ }).click();
 await page.waitForTimeout(800);
 const guardado = `${await page.locator('#trim-start').inputValue()}-${await page.locator('#trim-end').inputValue()}`;
 check('el recorte de un pad nuevo se guarda y se relee', guardado === '0.25-0.75', guardado);
 await page.getByRole('button', { name: /^Cerrar$/ }).click();
 await page.waitForTimeout(400);
+await volverAlTablero();
 
 // ── Categorías: son uno de los requisitos y no tenían ninguna cobertura ──────
+await abrirPreparacion();
 await page.getByRole('button', { name: /^(Categorías|Categories)$/ }).click();
 await page.waitForTimeout(400);
 await page.locator('#cat-name').fill('Naturaleza');
@@ -337,15 +369,17 @@ await page.waitForTimeout(900);
 check('la categoría aparece en el modal', await page.getByText('Naturaleza').count() > 0);
 await page.getByRole('button', { name: /^Cerrar$/ }).click();
 await page.waitForTimeout(400);
+await volverAlTablero();
 check('la categoría no aparece como filtro mientras esté vacía',
   await page.getByRole('button', { name: /^Naturaleza / }).count() === 0);
 
-await page.locator('[data-pad-id]').filter({ hasText: 'Cuenco' }).locator('..')
-  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await abrirPreparacion();
+await page.getByRole('button', { name: /^(Editar|Edit): Cuenco$/ }).click();
 await page.waitForTimeout(400);
 await page.locator('#pad-category').selectOption({ label: 'Naturaleza' });
 await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
 await page.waitForTimeout(1000);
+await volverAlTablero();
 await page.getByRole('button', { name: /^Naturaleza / }).click();
 await page.waitForTimeout(400);
 check('el filtro de la categoría muestra sólo su pad',
@@ -358,6 +392,7 @@ await page.waitForTimeout(300);
 // el escenario completo: exportar, perder los audios, importar y volver a sonar.
 const packPath = join(tmpdir(), `soundpad-e2e-${Date.now()}.zip`);
 const download = page.waitForEvent('download', { timeout: 20000 });
+await abrirPreparacion();
 await page.getByRole('button', { name: /Exportar pack|Export pack/ }).click();
 await (await download).saveAs(packPath);
 check('el pack se descarga', existsSync(packPath) && statSync(packPath).size > 0);
@@ -391,8 +426,10 @@ await page.waitForTimeout(1200);
 check('sin los audios, los pads avisan que falta el archivo',
   await page.getByText(/La ficha del sonido se sincronizó|The sound card is synced/).count() > 0);
 
+await abrirPreparacion();
 await page.locator('input[type=file][accept*="zip"]').setInputFiles(packPath);
 await page.waitForTimeout(2500);
+await volverAlTablero();
 // Se compara contra los PADS, no contra las claves guardadas: reemplazar el
 // archivo de un pad deja su audio viejo en el dispositivo hasta la próxima
 // sesión (está protegido de `pruneOrphans`), y el pack sólo lleva los que algún
@@ -412,6 +449,7 @@ rmSync(packPath, { force: true });
 
 // ── Modo organizar ──────────────────────────────────────────────────────────
 const antesDeOrdenar = await idsDePads();
+await abrirPreparacion();
 await page.getByRole('button', { name: /^(Organizar|Arrange)$/ }).click();
 await page.waitForTimeout(500);
 check('organizar oculta la grilla y muestra la lista',
@@ -427,6 +465,7 @@ for (let i = 0; i < antesDeOrdenar.length - 1; i++) {
 }
 await page.getByRole('button', { name: /^(Listo|Done)$/ }).click();
 await page.waitForTimeout(1200);
+await volverAlTablero();
 
 const despues = await idsDePads();
 check('el pad movido queda primero', despues[0] === ultimo, `primero: ${despues[0]}, esperado: ${ultimo}`);
@@ -440,6 +479,70 @@ await page.waitForSelector('[data-mode]', { timeout: 20000 });
 await page.getByRole('button', { name: /Utilitarios|Utilities/ }).first().click();
 await page.waitForTimeout(1500);
 check('el orden nuevo sobrevive a recargar la página', (await idsDePads())[0] === ultimo);
+
+// ── El tablero es sólo para disparar ────────────────────────────────────────
+// El motivo del corte: en medio de una ceremonia no puede haber a mano nada de
+// crear, editar ni configurar. Se comprueba por nombre accesible, que es lo que
+// el operador ve y lo que un dedo puede alcanzar.
+const nombresEnTablero = await page.evaluate(() => {
+  const visible = (el) => el.getBoundingClientRect().width > 0;
+  return [...document.querySelectorAll('button')].filter(visible)
+    .map(b => (b.getAttribute('aria-label') || b.textContent || '').trim());
+});
+const deConfiguracion = /Agregar sonido|Add sound|Categorías|Categories|Organizar|Arrange|Exportar|Export|Importar|Import|Editar:|Edit:|Favorito:|Favorite:|MIDI/i;
+check('el tablero no ofrece nada de crear, editar ni configurar',
+  nombresEnTablero.filter(n => deConfiguracion.test(n)).length === 0,
+  nombresEnTablero.filter(n => deConfiguracion.test(n)).join(' | '));
+
+// Y la preparación, en cambio, tiene que tenerlo todo — y no la grilla de
+// disparo, para que un toque desviado no suene mientras se prepara.
+await abrirPreparacion();
+const enPreparacion = await page.evaluate(() => {
+  const visible = (el) => el.getBoundingClientRect().width > 0;
+  return [...document.querySelectorAll('button')].filter(visible)
+    .map(b => (b.getAttribute('aria-label') || b.textContent || '').trim());
+});
+check('la preparación reemplaza al tablero, no lo tapa',
+  await page.locator('[data-pad-id]').count() === 0 &&
+  await page.locator('[data-setup-id]').count() === antesDeOrdenar.length,
+  `pads: ${await page.locator('[data-pad-id]').count()}, filas: ${await page.locator('[data-setup-id]').count()}`);
+for (const [etiqueta, patron] of [
+  ['agregar', /Agregar sonido|Add sound/i], ['categorías', /Categorías|Categories/i],
+  ['organizar', /Organizar|Arrange/i], ['pack', /Exportar|Export/i],
+  ['editar un pad', /^(Editar|Edit):/i], ['marcar favorito', /^(Favorito|Favorite):/i],
+]) {
+  check(`la preparación tiene ${etiqueta}`, enPreparacion.some(n => patron.test(n)));
+}
+
+// Los atajos de teclado son del tablero: mientras se prepara, un número escapado
+// no puede hacer sonar nada.
+//
+// Se usa la tecla del pad EN BUCLE, no la del primero: con un pad de medio
+// segundo, el rato que lleva volver al tablero para poder contar ya lo había
+// dejado callado y la comprobación pasaba con el guardia arrancado.
+await volverAlTablero();
+const teclaLluvia = await page.evaluate(() => {
+  const el = [...document.querySelectorAll('[data-pad-id]')]
+    .find(b => (b.getAttribute('aria-label') || b.textContent || '').trim().startsWith('Lluvia'));
+  return el?.querySelector('[data-shortcut]')?.getAttribute('data-shortcut') ?? null;
+});
+check('el pad en bucle tiene atajo asignado', teclaLluvia !== null, `tecla: ${teclaLluvia}`);
+
+await abrirPreparacion();
+await page.locator('body').click({ position: { x: 5, y: 5 } });
+await page.keyboard.press(teclaLluvia ?? '1');
+await page.waitForTimeout(500);
+await volverAlTablero();
+check('un número en la preparación no dispara ningún pad', await countPlaying() === 0,
+  `sonando: ${await countPlaying()}`);
+// …y que esa misma tecla sí sirve en el tablero, para que la comprobación de
+// arriba no pase por el simple hecho de que ahí no había pads.
+await page.locator('body').click({ position: { x: 5, y: 5 } });
+await page.keyboard.press(teclaLluvia ?? '1');
+await page.waitForTimeout(500);
+check('y en el tablero esa misma tecla sí dispara', await countPlaying() >= 1,
+  `sonando: ${await countPlaying()}`);
+await pararTodo();
 
 // ── Regresiones de las auditorías ───────────────────────────────────────────
 
@@ -491,6 +594,9 @@ check('Escape para todo', await esperarSilencio());
 // El guardia de escritura se ejercita en el BUSCADOR, no en un campo del
 // editor: dentro de un modal el atajo se descarta antes de llegar al guardia,
 // así que ahí la comprobación pasaba con el guardia eliminado.
+// El buscador vive plegado detrás de la lupa: hay que abrirlo primero.
+await page.getByRole('button', { name: /^(Buscar sonidos|Search sounds)$/ }).click();
+await page.waitForTimeout(300);
 const buscador = page.locator('input[type=text], input:not([type])').first();
 await buscador.fill('n');            // deja varios pads a la vista
 await buscador.focus();
@@ -506,14 +612,18 @@ await page.waitForTimeout(300);
 // cualquier fundido, para que un pánico indebido no pueda pasar desapercibido.
 await page.getByRole('button', { name: /^Lluvia/ }).first().dispatchEvent('pointerdown');
 await page.waitForTimeout(400);
-await page.locator('[data-pad-id]').filter({ hasText: 'Lluvia' }).locator('..')
-  .getByRole('button', { name: /^(Editar|Edit):/ }).click();
+await abrirPreparacion();
+await page.getByRole('button', { name: /^(Editar|Edit): Lluvia$/ }).click();
 await page.waitForTimeout(400);
 await page.keyboard.press('Escape');
 await page.waitForTimeout(1500);
+// Que el modal se cerró se mira ahí mismo; que el pad SIGUE sonando hay que
+// mirarlo en el tablero, que es donde viven las fichas de voz y los pads.
+const modalCerrado = await page.locator('#pad-name').count() === 0;
+await volverAlTablero();
 check('Escape con el modal abierto lo cierra SIN disparar el pánico',
-  await page.locator('#pad-name').count() === 0 && await countPlaying() === 1,
-  `sonando: ${await countPlaying()}`);
+  modalCerrado && await countPlaying() === 1,
+  `modal cerrado: ${modalCerrado} · sonando: ${await countPlaying()}`);
 
 // El pánico tiene que funcionar aunque el foco esté en un deslizador: es lo
 // último que toca el operador antes de necesitarlo. Se comprueba DÓNDE quedó el
@@ -561,6 +671,7 @@ check('no hay desbordamiento horizontal a 390px',
 
 // El modo Organizar en teléfono: sus flechas son la ÚNICA forma de reordenar
 // ahí (el asa de arrastre está oculta por debajo de `sm`).
+await abrirPreparacion();
 await page.getByRole('button', { name: /^(Organizar|Arrange)$/ }).click();
 await page.waitForTimeout(500);
 const flechas = await page.evaluate(() =>

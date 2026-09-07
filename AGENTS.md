@@ -38,8 +38,13 @@ con Google, en **[AUTH.md](AUTH.md)**.
 - **Consecuencia:** una ficha puede llegar desde otro dispositivo sin su audio.
   El pad se marca "falta el audio" y se arregla revinculando el archivo o
   importando el pack `.zip`.
+- **Dos pantallas:** el tablero (`SoundpadBoard`) se dedica entero a disparar;
+  crear, editar, categorías, orden, pack y MIDI viven en `SoundpadSetup`, detrás
+  del botón "Preparar el Soundpad". No devuelvas configuración al tablero: en un
+  teléfono dejaba un solo pad visible, y un toque desviado en medio de una
+  ceremonia caía en un menú.
 - **Antes de tocar este módulo, leé [docs/SOUNDPAD.md](docs/SOUNDPAD.md).** Están
-  ahí los diez gotchas que costaron un fallo real cada uno: por qué toda clave
+  ahí los dieciséis gotchas que costaron un fallo real cada uno: por qué toda clave
   recién escrita va protegida de `pruneOrphans`, por qué `subscribe()` entrega el
   estado actual, por qué las repeticiones son una sola fuente en bucle, por qué
   el disparo táctil se retira, y por qué nada puede empujar la grilla.
@@ -92,6 +97,10 @@ con Google, en **[AUTH.md](AUTH.md)**.
   navegador real, con la red caída a propósito: disparo, overlay vs exclusivo,
   pánico, persistencia en IndexedDB e ida y vuelta del pack `.zip`. Detalle en
   [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
+- **El `npm run build` de esas dos líneas no es adorno:** las pruebas de
+  navegador sirven `dist/`. Sin compilar, miden el build anterior y dan verde
+  sobre código que no está. `e2e/distFresco.mjs` corta la prueba si `dist/` quedó
+  atrás.
 
 ## 📋 TODO Prioritario
 Ver archivo `TODO.md` para el backlog detallado de mejoras de Director Mode y estabilidad.

@@ -13,8 +13,11 @@ import { chromium } from 'playwright';
 import { readFileSync, existsSync, statSync } from 'fs';
 import { createServer } from 'http';
 import { extname, join, normalize } from 'path';
+import { exigirDistFresco } from './distFresco.mjs';
 
+const ROOT = new URL('../', import.meta.url).pathname;
 const DIST = new URL('../dist/', import.meta.url).pathname;
+exigirDistFresco(ROOT, DIST);
 const TYPES = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml',
