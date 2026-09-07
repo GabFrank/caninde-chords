@@ -1,3 +1,11 @@
+# [3.1.0](https://github.com/GabFrank/caninde-chords/compare/v3.0.0...v3.1.0) (2026-09-07)
+
+
+### Features
+
+* **soundpad:** dedicar el tablero a disparar y mover la configuración aparte ([97377bf](https://github.com/GabFrank/caninde-chords/commit/97377bf7cd0d52ffbf64b820fc0965b3ead05cb3))
+* **soundpad:** dedicar el tablero a disparar y mover la configuración aparte ([#4](https://github.com/GabFrank/caninde-chords/issues/4)) ([faad125](https://github.com/GabFrank/caninde-chords/commit/faad1250f3a9168910ea73299c89281251169679))
+
 # [3.0.0](https://github.com/GabFrank/caninde-chords/compare/v2.17.0...v3.0.0) (2026-09-06)
 
 
