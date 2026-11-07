@@ -50,6 +50,20 @@ con Google, en **[AUTH.md](AUTH.md)**.
 - **MIDI no existe en iPhone ni iPad**: todos los navegadores de iOS usan WebKit
   y la Web MIDI API no está. `isMidiSupported()` lo detecta y la interfaz lo
   dice; no prometas MIDI en esos aparatos.
+
+### 5. Pedal de efectos por MIDI (salida)
+- **Concepto:** cada canción guarda un número de Program Change y abrirla deja
+  el pedal armado con ese preset. Funciona también en Modo Director.
+- **Dónde vive cada cosa:** el preset, en `UserSongSettings` (es de tu equipo, no
+  de la canción: compartirla no le impone tu numeración a nadie). El dispositivo
+  y el canal, en `localStorage`: el id de una salida MIDI vale sólo en esa
+  máquina.
+- **La app no corrige la numeración del fabricante.** Las tablas suelen estar
+  corridas en uno; hay un probador en Utilitarios para averiguarlo contra el
+  aparato. No agregues tablas de equivalencias por modelo.
+- **Antes de tocarlo, leé [docs/MIDI-PEDAL.md](docs/MIDI-PEDAL.md):** el canal
+  viaja corrido en uno, "sin preset" no es "preset 0", y el acceso MIDI hay que
+  recuperarlo al arrancar o el envío queda apagado en silencio.
 - **Antes de tocar este módulo, leé [docs/SOUNDPAD.md](docs/SOUNDPAD.md).** Están
   ahí los dieciocho gotchas que costaron un fallo real cada uno: por qué toda clave
   recién escrita va protegida de `pruneOrphans`, por qué `subscribe()` entrega el
@@ -104,6 +118,9 @@ con Google, en **[AUTH.md](AUTH.md)**.
   navegador real, con la red caída a propósito: disparo, overlay vs exclusivo,
   pánico, persistencia en IndexedDB e ida y vuelta del pack `.zip`. Detalle en
   [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
+- `npm run build && npm run midiout` — pedal de efectos fingido en un navegador
+  real: bytes del Program Change, corrimiento del canal, y los guardias de
+  repetición y de "sin preset". Detalle en [docs/MIDI-PEDAL.md](docs/MIDI-PEDAL.md).
 - **El `npm run build` de esas dos líneas no es adorno:** las pruebas de
   navegador sirven `dist/`. Sin compilar, miden el build anterior y dan verde
   sobre código que no está. `e2e/distFresco.mjs` corta la prueba si `dist/` quedó

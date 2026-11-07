@@ -177,7 +177,12 @@ service cloud.firestore {
              data.fontSize is number &&
              data.columns is number &&
              data.transpose is number &&
-             data.autoResize is bool;
+             data.autoResize is bool &&
+             // El preset del pedal es opcional. Si viene, tiene que ser un
+             // Program Change válido: el rango lo fija el estándar MIDI, y un
+             // cliente modificado no tiene por qué poder guardar otra cosa.
+             (!('midiProgram' in data) ||
+              (data.midiProgram is int && data.midiProgram >= 0 && data.midiProgram <= 127));
     }
 
     function isValidShare(data) {

@@ -236,7 +236,7 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
   ));
 
   return (
-    <div className={`w-full flex flex-col ${isShort ? 'gap-1.5' : 'gap-3'}`}>
+    <div data-soundpad-board className={`w-full flex flex-col ${isShort ? 'gap-1.5' : 'gap-3'}`}>
 
       {/* Barra de transporte. Sólo lo que se usa TOCANDO: cortar todo, el
           volumen general, buscar y la puerta a la preparación. */}

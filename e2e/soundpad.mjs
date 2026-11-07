@@ -511,8 +511,12 @@ check('el orden nuevo sobrevive a recargar la página', (await idsDePads())[0] =
 // crear, editar ni configurar. Se comprueba por nombre accesible, que es lo que
 // el operador ve y lo que un dedo puede alcanzar.
 const nombresEnTablero = await page.evaluate(() => {
+  // Acotado AL TABLERO: la navegación entre herramientas de Utilitarios vive
+  // por fuera y no es configuración del Soundpad.
+  const raiz = document.querySelector('[data-soundpad-board]');
+  if (!raiz) return ['(no se encontró el tablero)'];
   const visible = (el) => el.getBoundingClientRect().width > 0;
-  return [...document.querySelectorAll('button')].filter(visible)
+  return [...raiz.querySelectorAll('button')].filter(visible)
     .map(b => (b.getAttribute('aria-label') || b.textContent || '').trim());
 });
 const deConfiguracion = /Agregar sonido|Add sound|Categorías|Categories|Organizar|Arrange|Exportar|Export|Importar|Import|Editar:|Edit:|Favorito:|Favorite:|MIDI/i;
@@ -642,6 +646,10 @@ await page.evaluate(() => {
   window.__midiEntrada = entrada;
   navigator.requestMIDIAccess = () => Promise.resolve({
     inputs: new Map([['1', entrada]]),
+    // Un acceso de verdad SIEMPRE trae las dos listas. Omitir `outputs` hacía
+    // que `enable()` tirara por dentro y se lo tragara su `catch`, con lo que
+    // esta prueba medía un MIDI que nunca llegó a habilitarse.
+    outputs: new Map(),
     onstatechange: null,
   });
 });

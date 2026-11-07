@@ -1,17 +1,18 @@
 // Contenedor de los Utilitarios: Soundpad (sonidos de la ceremonia) y Afinador.
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Activity, LayoutGrid } from 'lucide-react';
+import { Activity, LayoutGrid, Cable } from 'lucide-react';
 import { useViewport } from '../lib/useViewport';
 import { GuitarTuner } from './GuitarTuner';
 import { translations } from '../translations';
 import { SoundpadBoard } from './SoundPad/SoundpadBoard';
+import { MidiPanel } from './MidiPanel';
 
 interface UtilitariosHubProps {
   lang?: 'es' | 'en';
 }
 
-type SubTab = 'soundpad' | 'tuner';
+type SubTab = 'soundpad' | 'tuner' | 'midi';
 
 export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ lang = 'es' }) => {
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('soundpad');
@@ -25,6 +26,7 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ lang = 'es' }) =
   const tabs: { id: SubTab; label: string; Icon: typeof Activity }[] = [
     { id: 'soundpad', label: t.soundpad, Icon: LayoutGrid },
     { id: 'tuner', label: t.tuner, Icon: Activity },
+    { id: 'midi', label: t.midiOut, Icon: Cable },
   ];
 
   return (
@@ -58,6 +60,18 @@ export const UtilitariosHub: React.FC<UtilitariosHubProps> = ({ lang = 'es' }) =
               transition={{ duration: 0.18 }}
             >
               <SoundpadBoard lang={lang} />
+            </motion.div>
+          )}
+
+          {activeSubTab === 'midi' && (
+            <motion.div
+              key="midi-tab"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.18 }}
+            >
+              <MidiPanel t={t} />
             </motion.div>
           )}
 
