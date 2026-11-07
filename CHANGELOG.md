@@ -1,3 +1,11 @@
+## [3.1.1](https://github.com/GabFrank/caninde-chords/compare/v3.1.0...v3.1.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **soundpad:** salida de pánico táctil y pads visibles en apaisado ([c3903f0](https://github.com/GabFrank/caninde-chords/commit/c3903f0bd459f28aa91610a953b759449fdb6415))
+* **soundpad:** salida de pánico táctil y pads visibles en apaisado ([#5](https://github.com/GabFrank/caninde-chords/issues/5)) ([5ac7b8b](https://github.com/GabFrank/caninde-chords/commit/5ac7b8b570dd50c5481f75f8b89d6992d24bf366))
+
 # [3.1.0](https://github.com/GabFrank/caninde-chords/compare/v3.0.0...v3.1.0) (2026-09-07)
 
 
