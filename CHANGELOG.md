@@ -1,3 +1,11 @@
+## [3.2.1](https://github.com/GabFrank/caninde-chords/compare/v3.2.0...v3.2.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **offline:** guardar sin red ya no traba la app ([bb12d10](https://github.com/GabFrank/caninde-chords/commit/bb12d10f29917d4df5f3d02b3b031eb53e4ab940))
+* **offline:** guardar sin red ya no traba la app ([#7](https://github.com/GabFrank/caninde-chords/issues/7)) ([772b355](https://github.com/GabFrank/caninde-chords/commit/772b3553c862c332fa725c884a812a9db57e103d))
+
 # [3.2.0](https://github.com/GabFrank/caninde-chords/compare/v3.1.1...v3.2.0) (2026-11-07)
 
 
