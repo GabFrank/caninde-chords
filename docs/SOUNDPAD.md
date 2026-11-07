@@ -41,9 +41,11 @@ El tablero se dedica **entero a disparar**. Crear, editar, categorías, orden,
 pack y MIDI viven en una pantalla aparte, `SoundpadSetup`, detrás del botón
 **Preparar el Soundpad**.
 
-Antes convivían. En un teléfono quedaba **un pad visible** y el resto de la
-pantalla era configuración que en vivo no se usa —y que un toque desviado en
-medio de una ceremonia podía activar.
+Antes convivían, y la configuración se comía la pantalla. Medido con 20 pads a
+390×844: antes entraban **6 pads enteros** arriba de la barra de navegación,
+ahora **9**; la grilla empieza 126px más arriba, una fila de tres. (Una primera
+versión de este documento decía "un solo pad visible": era falso. El cambio se
+justifica solo.)
 
 | En el tablero | En la preparación |
 | --- | --- |
@@ -59,8 +61,23 @@ Por lo mismo, los atajos de teclado y MIDI quedan inertes ahí (`arranging:
 setupOpen` en `liveRef`) — salvo el pánico, que nunca se desactiva.
 
 Marcar favorito y editar se hacen desde la lista de la preparación, no desde el
-pad: en el pad eran una estrella y un engranaje de 20px pegados a la zona de
-disparo.
+pad: en el pad eran una estrella y un engranaje de 36px pegados a la zona de
+disparo, dentro de un canalón de 10px. (Otra corrección: decían 20px.)
+
+### La franja de pánico
+
+Las pantallas que **no** son el tablero llevan arriba, pegajosa, una
+`PanicStrip`: vuelta al tablero, **PARAR TODO** y las fichas de lo que está
+sonando. El modo Organizar la recibe como primera fila de su propio bloque
+pegajoso, porque dos `sticky top-0` apilados se tapan entre sí.
+
+No es decoración. Al partir la pantalla, el operador se quedó sin forma de
+cortar un sonido **con el dedo**: Escape seguía funcionando, pero el aparato de
+esta app es un teléfono, donde no hay Escape, y el MIDI queda inerte a propósito
+mientras se prepara. El camino real de pánico desde el editor abierto medía tres
+toques (Cerrar → Tablero → PARAR TODO), y la preparación no mostraba ni una
+señal de que hubiera un ambiente en bucle sonando. Ahora es **un toque** desde
+cualquiera de las tres pantallas.
 
 ---
 
@@ -76,6 +93,7 @@ disparo.
 | `src/components/SoundPad/useSoundpad.ts` | Estado: Firestore + IndexedDB + motor |
 | `src/components/SoundPad/SoundpadBoard.tsx` | El tablero: sólo disparar |
 | `src/components/SoundPad/SoundpadSetup.tsx` | La preparación: crear, editar, categorías, orden, pack, MIDI |
+| `src/components/SoundPad/PanicStrip.tsx` | La salida de emergencia de las pantallas que no son el tablero |
 | `src/components/SoundPad/SoundPadButton.tsx` | El pad |
 | `src/components/SoundPad/SoundPadEditor.tsx` | Alta y edición |
 | `src/components/SoundPad/CategoryManager.tsx` | ABM de categorías |
@@ -85,10 +103,27 @@ disparo.
 | `src/lib/padTrim.ts` | Resolución del recorte contra la duración real |
 | `src/lib/waveform.ts` | Picos de la forma de onda |
 | `src/components/SoundPad/TrimEditor.tsx` | El recortador visual |
-| `src/services/midi.ts` | Web MIDI: permiso, controladores y notas |
+| `src/services/midi.ts` | Web MIDI **de entrada**: permiso, controladores y notas recibidas |
+
+El cromo de la app alrededor del módulo también cuenta: `src/App.tsx` y
+`src/components/UtilitariosHub.tsx` se compactan con `isShort` para que en
+teléfono apaisado entre una fila de pads (gotcha 17).
 
 Las interfaces `SoundPad` y `SoundCategory` están en `src/types.ts`; las reglas
 de acceso, en `firestore.rules`.
+
+### MIDI: hoy sólo entrada, y no en iOS
+
+`src/services/midi.ts` usa `access.inputs`: la app **escucha** notas para
+disparar pads. No manda nada (`access.outputs` no se toca), así que hoy no puede
+cambiarle un preset a un pedal.
+
+Y la Web MIDI API no existe en iPhone ni iPad: todos los navegadores de iOS están
+obligados a usar WebKit, que no la implementa (bug 107250), así que instalar otro
+navegador ahí no cambia nada. Sí funciona en Chrome/Edge de escritorio, Firefox
+108+ y Chrome en Android (con adaptador USB-OTG, o con un controlador Bluetooth
+MIDI que el sistema operativo ya exponga). `isMidiSupported()` lo detecta y la
+preparación lo dice en vez de ofrecer un botón inútil.
 
 ---
 
@@ -288,6 +323,52 @@ nuevo de `src/` y **corta la prueba** si quedó atrás. Un aviso no alcanzaba.
 Corolario para cualquier verificación por mutación: **romper el código a
 propósito y ver la prueba pasar no prueba nada si no se compiló en el medio.**
 
+### 17. El alto en teléfono apaisado se lo come el cromo, no el tablero
+
+A 844×390 **no entraba un solo pad** arriba de la barra de navegación: el primer
+pad arrancaba en `y=348` y la barra empezaba en `333`. El tablero no era el
+culpable. Los 348px se repartían así: cabecera 57, relleno del contenedor de
+Utilitarios 24 (a 844px de ancho entra `md:p-6`, justo en el caso donde falta
+alto), selector Soundpad/Afinador 71, y 180 del propio tablero (transporte 48 +
+franja de voces 48 + chips 48 + tres huecos de 12).
+
+La respuesta es `isShort` de `useViewport`, aplicado en cuatro sitios:
+`App.tsx` (relleno del contenedor y cabecera), `UtilitariosHub.tsx` (selector
+compacto, sin `min-h-[480px]`) y `SoundpadBoard.tsx`, donde **las fichas de voz
+se mudan a la barra de transporte** y desaparece la franja aparte: son 60px con
+su hueco, y en apaisado 60px son una fila de pads.
+
+Resultado medido: el primer pad pasa de `y=348` a `y=215`, y de **0 a 8 pads**
+alcanzables. Vertical y tablet quedan igual (`isShort` es falso ahí). Está
+cubierto por la comprobación *"en teléfono apaisado se alcanza al menos una fila
+de pads"*, que mide contra la barra de navegación y no contra el borde de la
+ventana: un pad debajo de la barra no se puede tocar.
+
+### 18. Verificar una mutación exige mirar el bundle servido
+
+El gotcha 16 dice que hay que compilar antes de correr la prueba. No alcanza. Al
+verificar las comprobaciones de este módulo pasó dos veces que **la edición se
+revirtió entre el `build` y la corrida**, y todo salió en verde sobre el build
+sano: la prueba parecía un placebo y no lo era. Al revés también pasa: un
+sabotaje escrito como `"MARCA" === ""` lo plancha el minificador y nunca llega
+al navegador.
+
+Por eso, después de compilar y antes de concluir nada:
+
+```bash
+grep -l MARCA dist/assets/*.js   # el código del Soundpad no está en el entry
+```
+
+Y la marca tiene que ser algo que sobreviva a la minificación —un nombre de
+propiedad como `window.MARCA`, no un comentario ni una comparación constante.
+
+Corolario del corolario: **un sabotaje que no cae no prueba que la comprobación
+sea floja.** Al probar el apaisado, desactivar `isShort` sólo en
+`UtilitariosHub` dejó la prueba en verde, porque los otros tres sitios ya
+ahorraban lo suficiente. Desactivándolo en `SoundpadBoard` —los 60px de la
+franja— cayó enseguida. Si el sabotaje es más angosto que el arreglo, mide otra
+cosa.
+
 ---
 
 ## Verificación
@@ -319,7 +400,22 @@ el orden nuevo sobreviva a recargar la página. También comprueba el corte entr
 tocar y preparar: que el tablero no ofrezca nada de crear ni configurar, que la
 preparación lo tenga todo y reemplace a la grilla, y que un número escapado
 mientras se prepara no dispare ningún sonido —comprobado con el pad en bucle,
-porque con uno corto la comprobación pasaba sola.
+porque con uno corto la comprobación pasaba sola, y con una aserción previa de
+que ese pad sigue siendo de bucle, porque si no el placebo vuelve en silencio.
+
+También: la franja de pánico en la preparación y en Organizar, que cerrar el
+editor apague lo que arrancó su "Probar" (y **sólo** eso), el guardia MIDI con
+un controlador fingido —se reemplaza `requestMIDIAccess`, así que lo que corre
+es `src/services/midi.ts` de verdad—, que ningún control del tablero mida menos
+de 44px, y que en teléfono apaisado se alcance al menos una fila de pads.
+
+Cada comprobación nueva se verificó por mutación con el build de por medio y
+confirmando la marca en el bundle servido (gotcha 18). `abrirPreparacion()` y
+`volverAlTablero()` **afirman** que la navegación ocurrió: la primera versión
+seguía de largo en silencio si el botón no estaba, y un fallo real aparecía
+treinta segundos después como un `TimeoutError` en otro paso. Y un fallo duro de
+locator ahora imprime las comprobaciones hechas hasta el corte, en vez de dejar
+al que la corre sin una sola línea.
 
 Las pruebas del motor están escritas para fallar si el código se rompe: se
 verificó saboteando el overlay, las repeticiones, la deduplicación de

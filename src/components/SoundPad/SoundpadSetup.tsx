@@ -11,7 +11,7 @@
 import React, { useRef, useState } from 'react';
 import {
   Plus, Tags, ArrowUpDown, Download, Upload, Radio, HardDrive, Keyboard,
-  ChevronLeft, Star, AlertTriangle, Settings2,
+  Star, AlertTriangle,
 } from 'lucide-react';
 import { SoundPad } from '../../types';
 import { Strings } from '../../translations';
@@ -22,6 +22,7 @@ import { useSoundpad } from './useSoundpad';
 import { SoundPadEditor } from './SoundPadEditor';
 import { CategoryManager } from './CategoryManager';
 import { PadArranger } from './PadArranger';
+import { PanicStrip } from './PanicStrip';
 
 interface SoundpadSetupProps {
   sp: ReturnType<typeof useSoundpad>;
@@ -85,12 +86,25 @@ export const SoundpadSetup: React.FC<SoundpadSetupProps> = ({
     onMidiOn(true);
   };
 
+  const franja = (
+    <PanicStrip
+      voices={sp.voices}
+      onStopAll={sp.stopAll}
+      onStopVoice={sp.stopVoice}
+      t={t}
+    />
+  );
+
+  // Organizando también hace falta la salida de emergencia. Antes, con cambios
+  // pendientes, cortar un bucle desde acá costaba cuatro toques: Cancelar →
+  // Borrar (la confirmación de descarte) → Tablero → PARAR TODO.
   if (arranging) {
     return (
       <PadArranger
         pads={sp.pads}
         onSave={sp.reorderPads}
         onCancel={() => setArranging(false)}
+        transport={franja}
         t={t}
       />
     );
@@ -99,17 +113,18 @@ export const SoundpadSetup: React.FC<SoundpadSetupProps> = ({
   return (
     <div className="w-full space-y-4">
 
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="min-h-11 pl-2 pr-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs font-black flex items-center gap-1"
-        >
-          <ChevronLeft size={16} />
-          {t.soundpadBackToBoard}
-        </button>
-        <h3 className="text-sm font-black text-zinc-500 truncate">{t.soundpadSetup}</h3>
+      {/* Pegajosa: con la lista desplazada, "Tablero" —el único camino táctil de
+          vuelta al pánico— se iba de pantalla y había que subir todo primero. */}
+      <div className="sticky top-0 z-20 -mx-1 px-1 bg-white/95 dark:bg-zinc-950/95 backdrop-blur">
+        <PanicStrip
+          voices={sp.voices}
+          onStopAll={sp.stopAll}
+          onStopVoice={sp.stopVoice}
+          onBack={onClose}
+          t={t}
+        />
       </div>
+      <h3 className="text-sm font-black text-zinc-500 truncate">{t.soundpadSetup}</h3>
 
       {/* Los sonidos, uno por fila: acá el nombre completo se lee y el toque cae
           donde tiene que caer, en vez de pelearse con una grilla de disparo. */}
@@ -148,10 +163,6 @@ export const SoundpadSetup: React.FC<SoundpadSetupProps> = ({
                   {falta ? t.soundpadMissing : formatDuration(pad.durationMs)}
                 </p>
               </button>
-
-              <span className="h-11 w-11 shrink-0 flex items-center justify-center text-zinc-400" aria-hidden="true">
-                <Settings2 size={16} />
-              </span>
             </div>
           );
         })}
@@ -276,6 +287,7 @@ export const SoundpadSetup: React.FC<SoundpadSetupProps> = ({
         onDelete={sp.deletePad}
         onPreview={sp.playPad}
         onStopPreview={(p) => sp.stopPad(p.id)}
+        onStopVoice={sp.stopVoice}
         previewing={editing.pad ? sp.voices.some(v => v.padId === editing.pad!.id) : false}
         t={t}
         lang={lang}

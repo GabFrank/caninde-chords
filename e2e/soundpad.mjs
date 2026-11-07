@@ -124,21 +124,47 @@ async function esperarSilencio(ms = 6000) {
   return false;
 }
 
-/** Entra a la pantalla de preparación (crear, editar, categorías, pack, orden). */
+/**
+ * Entra a la pantalla de preparación (crear, editar, categorías, pack, orden).
+ *
+ * Afirma que la navegación OCURRIÓ. La primera versión hacía
+ * `if (count > 0) click()` y seguía de largo en silencio si el botón no estaba:
+ * un fallo real aparecía treinta segundos después como un `TimeoutError`
+ * incomprensible en otro paso, y todo el archivo cuelga de estos dos ayudantes.
+ */
 async function abrirPreparacion() {
+  if (await page.locator('[data-setup-id]').count() > 0) return;  // ya estamos
   const b = page.getByRole('button', { name: /^(Preparar el Soundpad|Set up the Soundpad)$/ });
-  if (await b.count() > 0) await b.click();
+  if (await b.count() === 0) throw new Error('no se encontró el botón de preparación');
+  await b.click();
   await page.waitForTimeout(400);
+  if (await page.locator('[data-pad-id]').count() > 0) {
+    throw new Error('la preparación no reemplazó al tablero');
+  }
 }
-/** Vuelve al tablero. */
+/** Vuelve al tablero. Afirma, por lo mismo, que volvió. */
 async function volverAlTablero() {
   const b = page.getByRole('button', { name: /^(Tablero|Board)$/ });
-  if (await b.count() > 0) await b.click();
+  if (await b.count() === 0) throw new Error('no se encontró el botón de vuelta al tablero');
+  await b.click();
   await page.waitForTimeout(400);
+  if (await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).count() === 0) {
+    throw new Error('no se volvió al tablero');
+  }
 }
 
 const results = [];
 const check = (name, ok, extra = '') => { results.push(`${ok ? '✓' : '✗'} ${name}${extra ? ' — ' + extra : ''}`); if (!ok) process.exitCode = 1; };
+
+// Un fallo duro de locator abortaba el proceso sin imprimir UNA línea: con más
+// de sesenta comprobaciones, quien la corre se quedaba sin saber qué había
+// pasado antes del corte.
+process.on('exit', () => {
+  if (results.length > 0 && !global.__yaImprimio) {
+    console.log('\nComprobaciones hasta el corte:');
+    console.log(results.join('\n'));
+  }
+});
 
 // Ir a Utilitarios
 await page.getByRole('button', { name: /Utilitarios|Utilities/ }).first().click();
@@ -521,6 +547,13 @@ for (const [etiqueta, patron] of [
 // segundo, el rato que lleva volver al tablero para poder contar ya lo había
 // dejado callado y la comprobación pasaba con el guardia arrancado.
 await volverAlTablero();
+check('la sonda del guardia es un pad EN BUCLE', await page.evaluate(() => {
+  const el = [...document.querySelectorAll('[data-pad-id]')]
+    .find(b => (b.getAttribute('aria-label') || b.textContent || '').trim().startsWith('Lluvia'));
+  // La insignia de bucle indefinido; un pad de repeticiones finitas no la tiene.
+  return el !== undefined && el.querySelector('[data-loop]') !== null;
+}), 'sin esto, cambiar Lluvia a una sola pasada vuelve placebo la comprobación de abajo');
+
 const teclaLluvia = await page.evaluate(() => {
   const el = [...document.querySelectorAll('[data-pad-id]')]
     .find(b => (b.getAttribute('aria-label') || b.textContent || '').trim().startsWith('Lluvia'));
@@ -542,6 +575,134 @@ await page.keyboard.press(teclaLluvia ?? '1');
 await page.waitForTimeout(500);
 check('y en el tablero esa misma tecla sí dispara', await countPlaying() >= 1,
   `sonando: ${await countPlaying()}`);
+await pararTodo();
+
+// ── La salida de emergencia en las pantallas que no son el tablero ──────────
+// Una auditoría midió el camino real de pánico desde la preparación: no había
+// ninguno para el dedo. Escape funcionaba, pero el aparato de esta app es un
+// teléfono, donde no hay Escape, y el MIDI queda inerte a propósito ahí.
+await page.getByRole('button', { name: /^Lluvia/ }).first().dispatchEvent('pointerdown');
+await page.waitForTimeout(400);
+await abrirPreparacion();
+check('la preparación muestra que hay algo sonando', await fichasDeVoz() === 1,
+  `fichas: ${await fichasDeVoz()}`);
+check('y tiene PARAR TODO habilitado',
+  await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).count() === 1 &&
+  !(await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).isDisabled()));
+await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
+await page.waitForTimeout(600);
+check('el pánico de la preparación corta de verdad', await fichasDeVoz() === 0,
+  `fichas: ${await fichasDeVoz()}`);
+
+// Organizando también: antes, con cambios pendientes, cortar un bucle desde acá
+// costaba cuatro toques (Cancelar → Borrar → Tablero → PARAR TODO).
+await volverAlTablero();
+await page.getByRole('button', { name: /^Lluvia/ }).first().dispatchEvent('pointerdown');
+await page.waitForTimeout(400);
+await abrirPreparacion();
+await page.getByRole('button', { name: /^(Organizar|Arrange)$/ }).click();
+await page.waitForTimeout(500);
+check('organizando también hay PARAR TODO, a un toque',
+  await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).count() === 1 &&
+  !(await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).isDisabled()));
+await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
+await page.waitForTimeout(600);
+check('y corta sin salir del modo organizar',
+  await fichasDeVoz() === 0 && await page.locator('[data-arrange-id]').count() > 0,
+  `fichas: ${await fichasDeVoz()}, filas: ${await page.locator('[data-arrange-id]').count()}`);
+await page.getByRole('button', { name: /^(Cancelar|Cancel)$/ }).click();
+await page.waitForTimeout(400);
+
+// El "Probar" del editor dejaba un bucle suelto y mudo al cerrar. Lo que NO
+// puede pasar es lo contrario: cerrar el editor no puede callar un pad que el
+// operador disparó a propósito antes de abrirlo (eso lo cubre la comprobación
+// de Escape más abajo).
+await page.getByRole('button', { name: /^(Editar|Edit): Lluvia$/ }).click();
+await page.waitForTimeout(400);
+await page.getByRole('button', { name: /^(Probar|Test)$/ }).click();
+await page.waitForTimeout(600);
+const probando = await fichasDeVoz();
+await page.getByRole('button', { name: /^(Cerrar|Close)$/ }).click();
+await page.waitForTimeout(800);
+check('cerrar el editor apaga el sonido que arrancó su "Probar"',
+  probando === 1 && await fichasDeVoz() === 0,
+  `probando: ${probando}, tras cerrar: ${await fichasDeVoz()}`);
+await volverAlTablero();
+
+// ── MIDI: el pedal dispara, y queda inerte mientras se prepara ─────────────
+// El guardia MIDI no tenía NINGUNA prueba: el commit afirmaba "los atajos de
+// teclado y MIDI quedan inertes ahí" con cobertura sólo para el teclado.
+//
+// No hay controlador en el navegador de prueba, así que se finge uno: se
+// reemplaza `requestMIDIAccess` por un acceso con una entrada falsa a la que
+// después se le puede empujar un mensaje de nota. Es la misma API que usa
+// `src/services/midi.ts`, así que lo que se ejercita es el código de verdad.
+await page.evaluate(() => {
+  const entrada = { name: 'Pedal falso', onmidimessage: null };
+  window.__midiEntrada = entrada;
+  navigator.requestMIDIAccess = () => Promise.resolve({
+    inputs: new Map([['1', entrada]]),
+    onstatechange: null,
+  });
+});
+const notaDePrueba = 60;
+const pisarPedal = () => page.evaluate((nota) => {
+  window.__midiEntrada.onmidimessage({ data: new Uint8Array([0x90, nota, 100]) });
+}, notaDePrueba);
+
+await abrirPreparacion();
+await page.getByRole('button', { name: /^(Habilitar MIDI|Enable MIDI)$/ }).click();
+await page.waitForTimeout(600);
+check('el controlador falso queda enganchado',
+  await page.evaluate(() => typeof window.__midiEntrada.onmidimessage === 'function'));
+
+// La nota se asigna con "Aprender", que es el único camino que ofrece la
+// interfaz: así la prueba cubre también que aprender funcione.
+await page.getByRole('button', { name: /^(Editar|Edit): Lluvia$/ }).click();
+await page.waitForTimeout(400);
+await page.getByRole('button', { name: /^(Aprender|Learn)$/ }).click();
+await page.waitForTimeout(200);
+await pisarPedal();
+await page.waitForTimeout(400);
+// midiNoteName(60) => "C4 (60)". Se busca el número, que es inequívoco.
+check('"Aprender" captura la nota del controlador',
+  await page.evaluate(() => /\(60\)/.test(document.querySelector('[data-overlay]')?.innerText ?? '')),
+  await page.evaluate(() => (document.querySelector('[data-overlay]')?.innerText ?? '').slice(0, 160).replace(/\n/g, ' / ')));
+await page.getByRole('button', { name: /^Guardar|^Save/ }).click();
+await page.waitForTimeout(900);
+
+// Primero, en la preparación: NO puede sonar.
+await pisarPedal();
+await page.waitForTimeout(600);
+check('el pedal no dispara mientras se prepara', await fichasDeVoz() === 0,
+  `fichas: ${await fichasDeVoz()}`);
+
+// Y en el tablero SÍ, para que lo de arriba no pase por estar el MIDI roto.
+await volverAlTablero();
+await pisarPedal();
+await page.waitForTimeout(600);
+check('y en el tablero el pedal sí dispara', await countPlaying() === 1,
+  `sonando: ${await countPlaying()}`);
+await pararTodo();
+
+// ── Tamaños táctiles en la pantalla que existe para el dedo ────────────────
+// El argumento central del corte era el tamaño de los objetivos; no había
+// ninguna comprobación de eso en el tablero, sólo en el modo Organizar.
+await page.getByRole('button', { name: /^Lluvia/ }).first().dispatchEvent('pointerdown');
+await page.waitForTimeout(400);
+const chicos = await page.evaluate(() => {
+  const dentro = (el) => el.closest('[data-overlay]') === null;
+  return [...document.querySelectorAll('button')]
+    .filter(b => b.getBoundingClientRect().width > 0 && dentro(b))
+    .map(b => ({
+      n: (b.getAttribute('aria-label') || b.textContent || '').trim().slice(0, 28),
+      w: Math.round(b.getBoundingClientRect().width),
+      h: Math.round(b.getBoundingClientRect().height),
+    }))
+    .filter(b => b.w < 44 || b.h < 44);
+});
+check('ningún control del tablero mide menos de 44px', chicos.length === 0,
+  JSON.stringify(chicos));
 await pararTodo();
 
 // ── Regresiones de las auditorías ───────────────────────────────────────────
@@ -657,6 +818,28 @@ await page.getByRole('button', { name: /PARAR TODO|STOP ALL/ }).click();
 await page.waitForTimeout(500);
 check('el pánico lo corta', await fichasDeVoz() === 0);
 
+// (e2) En teléfono APAISADO tiene que entrar al menos una fila de pads.
+// Una auditoría midió cero: el primer pad arrancaba en y=348 y la barra de
+// navegación de la app empezaba en 333, así que no había un solo pad tocable
+// sin desplazarse. El alto se lo comían la cabecera, el relleno del contenedor
+// (a 844px de ancho entra `md:p-6`), el selector de herramientas y la franja
+// de voces. Se mide contra la barra de navegación, no contra el borde de la
+// ventana: un pad debajo de la barra no se puede tocar.
+await page.setViewportSize({ width: 844, height: 390 });
+await page.waitForTimeout(700);
+const apaisado = await page.evaluate(() => {
+  const nav = [...document.querySelectorAll('nav')].find(n => n.getBoundingClientRect().width > 0);
+  const navTop = nav ? nav.getBoundingClientRect().top : window.innerHeight;
+  const pads = [...document.querySelectorAll('[data-pad-id]')].map(e => e.getBoundingClientRect());
+  return {
+    navTop: Math.round(navTop),
+    primerPad: pads[0] ? Math.round(pads[0].top) : null,
+    alcanzables: pads.filter(p => p.top >= 0 && p.bottom <= navTop).length,
+  };
+});
+check('en teléfono apaisado se alcanza al menos una fila de pads',
+  apaisado.alcanzables >= 3, JSON.stringify(apaisado));
+
 // (e) En teléfono, los botones de sólo ícono tienen que tener nombre.
 await page.setViewportSize({ width: 390, height: 844 });
 await page.waitForTimeout(500);
@@ -699,6 +882,7 @@ check('el botón de guardar el orden se ve sin desplazarse', await page.evaluate
 
 check('sin errores de JavaScript', errs.length === 0, errs.join(' | '));
 
+global.__yaImprimio = true;
 console.log(results.join('\n'));
 console.log(process.exitCode ? '\nHay comprobaciones en rojo.' : '\nSoundpad en verde.');
 await browser.close();

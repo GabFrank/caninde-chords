@@ -11,8 +11,24 @@ Acordado con el usuario, en este orden:
   pánico, y nota MIDI por pad con "Aprender". Ver gotcha 11 de
   [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
 
+- [x] **Pantalla de tocar separada de la de preparar**, y después la salida de
+  pánico táctil que ese corte había dejado afuera, más los pads en teléfono
+  apaisado. Ver "Dos pantallas" y gotchas 17 y 18 de
+  [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
+
 Más adelante, sin fecha:
 
+- [ ] **MIDI de salida para cambiar presets de un pedal.** Pedido concreto: un
+  Hologram Microcosm con presets guardados, y que seleccionar una canción en la
+  app mande el Program Change que deja el pedal listo. Hoy `src/services/midi.ts`
+  sólo usa `access.inputs`; esto necesita `outputs` y `output.send()`, un campo
+  de preset por canción, y elegir el dispositivo de salida. Notas para cuando se
+  encare: el Microcosm escucha en canal 1 por defecto; Program Change cubre sus
+  44 variaciones y sus 16 presets de usuario; **la numeración que publica el
+  manual aparece corrida en uno** según reportes de usuarios, así que hay que
+  verificarla contra el aparato; y no tiene CC de siguiente/anterior preset, así
+  que el que cuenta es quien manda. No funciona en iPhone ni iPad (WebKit no
+  implementa Web MIDI).
 - [ ] **Disparo remoto en Modo Director:** que el director dispare un pad y suene
   en los dispositivos conectados. La infraestructura de sesiones ya existe; falta
   resolver que los espectadores tengan los mismos audios (pack `.zip`) y la

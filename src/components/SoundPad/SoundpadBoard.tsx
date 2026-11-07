@@ -17,10 +17,10 @@ import {
 import { useAuth } from '../AuthProvider';
 import { useViewport } from '../../lib/useViewport';
 import { SoundPad } from '../../types';
-import { translations, Strings } from '../../translations';
+import { translations } from '../../translations';
 import { padColor, UNCATEGORIZED_ID } from '../../lib/soundpadStyles';
 import { resolveShortcut, shortcutKeyFor } from '../../lib/padShortcuts';
-import { midiService, isMidiSupported } from '../../services/midi';
+import { midiService } from '../../services/midi';
 import { useSoundpad } from './useSoundpad';
 import { SoundPadButton } from './SoundPadButton';
 import { SoundpadSetup } from './SoundpadSetup';
@@ -51,13 +51,18 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
 
   // El progreso se refresca sólo mientras hay algo sonando: un intervalo
   // permanente mantendría la pantalla despierta y el móvil caliente sin motivo.
+  //
+  // Y tampoco mientras se prepara: este componente sigue montado detrás de
+  // `SoundpadSetup`, así que el intervalo volvía a dibujar la lista de
+  // preparación diez veces por segundo sin que nadie mire un progreso. Medido:
+  // 40 ms de JS cada 4 s con un bucle sonando, contra 1 ms en silencio.
   const readClock = sp.clock;
   useEffect(() => {
-    if (sp.voices.length === 0) return;
+    if (setupOpen || sp.voices.length === 0) return;
     setClock(readClock());
     const id = window.setInterval(() => setClock(readClock()), 100);
     return () => window.clearInterval(id);
-  }, [sp.voices.length, readClock]);
+  }, [setupOpen, sp.voices.length, readClock]);
 
   // Mientras el tablero está abierto la pantalla no se apaga: en iOS bloquear la
   // pantalla suspende el audio, y el operador necesita ver los pads igual.
@@ -216,8 +221,22 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
     { id: UNCATEGORIZED_ID, label: t.soundpadUncategorized, count: countByCategory[UNCATEGORIZED_ID] ?? 0 },
   ].filter(chip => chip.id === ALL || chip.count > 0 || chip.id === FAVORITES);
 
+  const fichasDeVoz = sp.voices.map(voice => (
+    <button
+      key={voice.voiceId}
+      type="button"
+      onClick={() => sp.stopVoice(voice.voiceId)}
+      data-voice-id={voice.voiceId}
+      aria-label={`${t.soundpadStopVoice}: ${voice.padName}`}
+      className="shrink-0 min-h-11 pl-2.5 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-blue-200 dark:border-blue-900 text-[11px] font-bold flex items-center gap-1.5"
+    >
+      {voice.padName}
+      <X size={12} className="text-zinc-400" />
+    </button>
+  ));
+
   return (
-    <div className="w-full flex flex-col gap-3">
+    <div className={`w-full flex flex-col ${isShort ? 'gap-1.5' : 'gap-3'}`}>
 
       {/* Barra de transporte. Sólo lo que se usa TOCANDO: cortar todo, el
           volumen general, buscar y la puerta a la preparación. */}
@@ -241,6 +260,9 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
             onChange={(e) => sp.setMasterVolume(Number(e.target.value))}
             className="w-full h-11 accent-blue-600 cursor-pointer"
           />
+          <span className="text-[10px] font-mono tabular-nums text-zinc-400 shrink-0 w-6 text-right">
+            {Math.round(sp.masterVolume * 100)}
+          </span>
         </div>
 
         <button
@@ -252,11 +274,22 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
         >
           <Search size={16} />
         </button>
+        {/* Separado de la lupa por un filete y con otro tratamiento: los dos
+            eran íconos de 44px, sin texto y con el mismo fondo gris, a 8px uno
+            del otro. Errarle acá borra la grilla entera en medio de la
+            ceremonia, que es justo el accidente que este corte venía a evitar. */}
+        {isShort && sp.voices.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto touch-scrolling min-w-0 px-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
+            {fichasDeVoz}
+          </div>
+        )}
+
+        <span className="w-px h-8 bg-zinc-200 dark:bg-zinc-700 shrink-0 ml-1" aria-hidden="true" />
         <button
           type="button"
           onClick={() => setSetupOpen(true)}
           aria-label={t.soundpadSetup}
-          className="min-h-11 min-w-11 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-500 flex items-center justify-center shrink-0"
+          className="min-h-11 min-w-11 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 text-zinc-500 flex items-center justify-center shrink-0"
         >
           <SlidersHorizontal size={16} />
         </button>
@@ -267,7 +300,10 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
           <input
             value={search}
-            autoFocus
+            // `autoFocus` a secas levantaba el teclado virtual sobre la grilla
+            // cada vez que se volvía de la preparación: el input se desmonta y
+            // se remonta en ese viaje, así que el foco se pedía de nuevo.
+            autoFocus={searchOpen && sp.voices.length === 0}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.soundpadSearch}
             aria-label={t.soundpadSearch}
@@ -277,39 +313,32 @@ export const SoundpadBoard: React.FC<SoundpadBoardProps> = ({ lang = 'es' }) => 
       )}
 
       {/* Qué está sonando. El alto es fijo aunque no haya nada: insertarlo al
-          disparar empujaba la grilla 70px y el segundo toque caía en otro pad. */}
-      <div className="h-12 flex items-center shrink-0">
-        {sp.voices.length > 0 ? (
-          <div className="w-full h-full flex items-center gap-1.5 px-2 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 overflow-x-auto touch-scrolling">
-            {sp.voices.map(voice => (
-              <button
-                key={voice.voiceId}
-                type="button"
-                onClick={() => sp.stopVoice(voice.voiceId)}
-                data-voice-id={voice.voiceId}
-                aria-label={`${t.soundpadStopVoice}: ${voice.padName}`}
-                className="shrink-0 min-h-9 pl-2.5 pr-2 rounded-lg bg-white dark:bg-zinc-900 border border-blue-200 dark:border-blue-900 text-[11px] font-bold flex items-center gap-1.5"
-              >
-                {voice.padName}
-                <X size={12} className="text-zinc-400" />
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p className="text-[10px] text-zinc-500 px-1">{t.soundpadIdle}</p>
-        )}
-      </div>
+          disparar empujaba la grilla 70px y el segundo toque caía en otro pad
+          (gotcha 6). En pantalla baja esta franja no existe y las fichas viven
+          en la barra de transporte, que ya tiene alto reservado: ahí el alto es
+          el recurso escaso y 60px son una fila de pads. */}
+      {!isShort && (
+        <div className="h-12 flex items-center shrink-0">
+          {sp.voices.length > 0 ? (
+            <div className="w-full h-full flex items-center gap-1.5 px-2 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 overflow-x-auto touch-scrolling">
+              {fichasDeVoz}
+            </div>
+          ) : (
+            <p className="text-[10px] text-zinc-500 px-1">{t.soundpadIdle}</p>
+          )}
+        </div>
+      )}
 
       {/* Filtros: es navegación para tocar, no configuración. */}
       {chips.length > 2 && (
-        <div className="flex gap-1.5 overflow-x-auto touch-scrolling pb-1 shrink-0">
+        <div className={`flex gap-1.5 overflow-x-auto touch-scrolling shrink-0 ${isShort ? '' : 'pb-1'}`}>
           {chips.map(chip => (
             <button
               key={chip.id}
               type="button"
               onClick={() => setFilter(chip.id)}
               aria-pressed={filter === chip.id}
-              className={`shrink-0 min-h-9 px-3 rounded-full text-[11px] font-bold flex items-center gap-1.5 transition-colors ${filter === chip.id ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'}`}
+              className={`shrink-0 min-h-11 px-3 rounded-full text-[11px] font-bold flex items-center gap-1.5 transition-colors ${filter === chip.id ? 'bg-blue-600 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'}`}
             >
               {chip.id === FAVORITES
                 ? <Star size={11} className={filter === chip.id ? 'fill-current' : ''} />

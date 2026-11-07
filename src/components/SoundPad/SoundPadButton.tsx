@@ -164,7 +164,7 @@ export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
               {pad.overlay ? <Layers size={10} /> : <Scissors size={10} />}
               {(pad.trimStartMs !== undefined || pad.trimEndMs !== undefined) && <Crop size={10} />}
               {loop
-                ? <InfinityIcon size={10} />
+                ? <InfinityIcon size={10} data-loop="true" />
                 : pad.repeat > 1 && (
                     <span className="inline-flex items-center gap-0.5">
                       <Repeat size={10} />{pad.repeat}
@@ -186,21 +186,21 @@ export const SoundPadButton: React.FC<SoundPadButtonProps> = ({
         )}
       </button>
 
-      {/* Favorito y ajustes van DENTRO de las esquinas del pad, no sobresaliendo:
-          con 10px de canalón, dos controles que sobresalen 8px se solapan con los
-          del pad vecino y el operador marca un favorito cuando quería disparar.
-          Miden 36px, que es el área táctil mínima razonable. */}
       {/* Mientras suena, un botón para cortar SÓLO este sonido: un ambiente de
           una sola pasada no se corta volviendo a tocar el pad (se superpondría
-          consigo mismo si es de overlay), y el pánico calla todo lo demás. */}
+          consigo mismo si es de overlay), y el pánico calla todo lo demás.
+          44px, no 36: es un control que se usa en vivo y a media luz, y comerse
+          un cuarto del pad no cuesta nada mientras suena —tocar el resto del pad
+          de un bucle también lo corta, y de uno de overlay lo vuelve a disparar,
+          que es lo que se quiere tener lejos del dedo apurado. */}
       {playing && !dense && (
         <button
           type="button"
           onClick={() => onStop(pad)}
           aria-label={`${labels.stop}: ${pad.name}`}
-          className="absolute top-0.5 right-0.5 h-9 w-9 rounded-full flex items-center justify-center text-red-100"
+          className="absolute top-0 right-0 h-11 w-11 rounded-full flex items-center justify-center text-red-100"
         >
-          <Square size={13} className="fill-current" />
+          <Square size={14} className="fill-current" />
         </button>
       )}
     </div>
