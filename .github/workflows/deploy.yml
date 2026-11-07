@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Test (Harmony Engine)
+      - name: Pruebas unitarias
         run: npm test
 
       # Compuerta de interfaz: levanta la app compilada en Chromium y falla si

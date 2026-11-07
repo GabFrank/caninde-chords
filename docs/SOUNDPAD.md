@@ -103,7 +103,7 @@ cualquiera de las tres pantallas.
 | `src/lib/padTrim.ts` | Resolución del recorte contra la duración real |
 | `src/lib/waveform.ts` | Picos de la forma de onda |
 | `src/components/SoundPad/TrimEditor.tsx` | El recortador visual |
-| `src/services/midi.ts` | Web MIDI **de entrada**: permiso, controladores y notas recibidas |
+| `src/services/midi.ts` | Web MIDI: el Soundpad usa la entrada (notas recibidas); la salida es del [pedal](MIDI-PEDAL.md) |
 
 El cromo de la app alrededor del módulo también cuenta: `src/App.tsx` y
 `src/components/UtilitariosHub.tsx` se compactan con `isShort` para que en
@@ -112,13 +112,16 @@ teléfono apaisado entre una fila de pads (gotcha 17).
 Las interfaces `SoundPad` y `SoundCategory` están en `src/types.ts`; las reglas
 de acceso, en `firestore.rules`.
 
-### MIDI: hoy sólo entrada, y no en iOS
+### MIDI: el Soundpad usa la entrada; la salida es otro módulo
 
-`src/services/midi.ts` usa `access.inputs`: la app **escucha** notas para
-disparar pads. No manda nada (`access.outputs` no se toca), así que hoy no puede
-cambiarle un preset a un pedal.
+`src/services/midi.ts` atiende las dos direcciones, pero el Soundpad sólo usa
+`access.inputs`: **escucha** notas para disparar pads. La salida
+—`access.outputs`, mandarle Program Change a un pedal de efectos para que cada
+canción cargue su preset— es del otro módulo, y está en
+[MIDI-PEDAL.md](MIDI-PEDAL.md). Comparten el servicio y el permiso: habilitar
+MIDI en cualquiera de los dos habilita el otro.
 
-Y la Web MIDI API no existe en iPhone ni iPad: todos los navegadores de iOS están
+La Web MIDI API no existe en iPhone ni iPad: todos los navegadores de iOS están
 obligados a usar WebKit, que no la implementa (bug 107250), así que instalar otro
 navegador ahí no cambia nada. Sí funciona en Chrome/Edge de escritorio, Firefox
 108+ y Chrome en Android (con adaptador USB-OTG, o con un controlador Bluetooth
@@ -382,7 +385,7 @@ cosa.
 
 ```bash
 npm run lint                    # tsc --noEmit
-npm test                        # vitest: motor, biblioteca y pack
+npm test                        # vitest: motor, biblioteca, pack, MIDI y escrituras
 npm run build && npm run smoke  # interfaz en cuatro viewports
 npm run build && npm run soundpad
 ```

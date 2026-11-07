@@ -15,11 +15,11 @@ Acordado con el usuario, en este orden:
   pánico táctil que ese corte había dejado afuera, más los pads en teléfono
   apaisado. Ver "Dos pantallas" y gotchas 17 y 18 de
   [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
+- [x] **MIDI de salida para cambiar presets de un pedal.** Ver
+  [docs/MIDI-PEDAL.md](docs/MIDI-PEDAL.md).
 
 Más adelante, sin fecha:
 
-- [x] **MIDI de salida para cambiar presets de un pedal.** Ver
-  [docs/MIDI-PEDAL.md](docs/MIDI-PEDAL.md).
 - [ ] **Disparo remoto en Modo Director:** que el director dispare un pad y suene
   en los dispositivos conectados. La infraestructura de sesiones ya existe; falta
   resolver que los espectadores tengan los mismos audios (pack `.zip`) y la
@@ -55,17 +55,8 @@ Salieron de dos rondas de auditoría y se decidió no corregirlos por ahora.
 
 ### Encontrado de paso, SIN ARREGLAR
 
-- [ ] **Guardar una canción sin red traba la app para siempre.** `addDoc` y
-  `updateDoc` esperan el acuse del servidor, que sin conexión no llega nunca,
-  así que `globalLoading` nunca se apaga y queda un velo "SAVING…" a pantalla
-  completa que bloquea todo. Verificado: sigue ahí a los 30 segundos, y la única
-  salida es recargar. **La escritura SÍ se aplicó** en la caché local y se
-  sincroniza después, así que lo único roto es la espera. Es grave para el caso
-  de uso del proyecto: en el lugar de la ceremonia no hay red. El arreglo es el
-  mismo patrón que ya usa el Soundpad (ver gotcha 7 de
-  [docs/SOUNDPAD.md](docs/SOUNDPAD.md)): no esperar al servidor, confiar en la
-  escritura local y mostrar el error si llega. Toca el guardado de canciones y
-  setlists, que es el centro de la app, así que merece su propia vuelta.
+- [x] **Guardar una canción sin red traba la app para siempre.** Arreglado:
+  ver [docs/OFFLINE.md](docs/OFFLINE.md).
 - [ ] **Preset del pedal por entrada de setlist.** Hoy el preset es de la
   canción (en tus ajustes). La misma canción puede querer otro sonido en otra
   ceremonia; un ajuste por posición del setlist lo cubriría, pisando al de la
