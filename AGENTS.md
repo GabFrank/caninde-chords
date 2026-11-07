@@ -40,11 +40,18 @@ con Google, en **[AUTH.md](AUTH.md)**.
   importando el pack `.zip`.
 - **Dos pantallas:** el tablero (`SoundpadBoard`) se dedica entero a disparar;
   crear, editar, categorías, orden, pack y MIDI viven en `SoundpadSetup`, detrás
-  del botón "Preparar el Soundpad". No devuelvas configuración al tablero: en un
-  teléfono dejaba un solo pad visible, y un toque desviado en medio de una
-  ceremonia caía en un menú.
+  del botón "Preparar el Soundpad". No devuelvas configuración al tablero: a
+  390×844 la grilla pasó de 6 pads enteros a 9, y un toque desviado en medio de
+  una ceremonia caía en un menú.
+- **Toda pantalla del Soundpad que no sea el tablero lleva la `PanicStrip`**
+  arriba y pegajosa: PARAR TODO, las voces activas y la vuelta al tablero. El
+  aparato es un teléfono: no hay tecla Escape, y el MIDI queda inerte mientras
+  se prepara. Si agregás una pantalla al módulo, ponele la franja.
+- **MIDI no existe en iPhone ni iPad**: todos los navegadores de iOS usan WebKit
+  y la Web MIDI API no está. `isMidiSupported()` lo detecta y la interfaz lo
+  dice; no prometas MIDI en esos aparatos.
 - **Antes de tocar este módulo, leé [docs/SOUNDPAD.md](docs/SOUNDPAD.md).** Están
-  ahí los dieciséis gotchas que costaron un fallo real cada uno: por qué toda clave
+  ahí los dieciocho gotchas que costaron un fallo real cada uno: por qué toda clave
   recién escrita va protegida de `pruneOrphans`, por qué `subscribe()` entrega el
   estado actual, por qué las repeticiones son una sola fuente en bucle, por qué
   el disparo táctil se retira, y por qué nada puede empujar la grilla.

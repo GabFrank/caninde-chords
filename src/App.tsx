@@ -297,7 +297,7 @@ export default function App() {
   const [isToolbarExpanded, setIsToolbarExpanded] = useState(false);
   // El layout se decide por ancho Y alto: un teléfono acostado es ancho y bajo,
   // y con el criterio anterior (solo ancho) recibía el layout de escritorio.
-  const { mode, isLandscape, isTablet } = useViewport();
+  const { mode, isLandscape, isTablet, isShort } = useViewport();
   const isCompact = mode === 'compact';
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -1423,12 +1423,12 @@ export default function App() {
       
       {/* Header */}
       {!isFullScreen && (
-        <header className={`${isCompact && isLandscape ? 'py-1' : 'p-2'} px-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-inherit z-10 safe-area-top safe-area-x`}>
+        <header className={`${isShort ? 'py-0.5' : isCompact && isLandscape ? 'py-1' : 'p-2'} px-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-inherit z-10 safe-area-top safe-area-x`}>
           <div className="flex items-center gap-2">
             <img 
               src={getLogoUrl()} 
               alt="CanindeChords Logo" 
-              className="w-6 h-6 rounded-lg shadow-sm"
+              className={`${isShort ? 'w-5 h-5' : 'w-6 h-6'} rounded-lg shadow-sm`}
               referrerPolicy="no-referrer"
             />
             {!isCompact && (
@@ -1877,7 +1877,7 @@ export default function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="h-full flex flex-col overflow-y-auto bg-zinc-50 dark:bg-zinc-950 p-4 md:p-6"
+                  className={`h-full flex flex-col overflow-y-auto bg-zinc-50 dark:bg-zinc-950 ${isShort ? 'p-2' : 'p-4 md:p-6'}`}
                 >
                   <UtilitariosHub
                     lang={(profile?.language || 'en') as 'es' | 'en'}

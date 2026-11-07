@@ -25,6 +25,12 @@ interface PadArrangerProps {
   pads: SoundPad[];
   onSave: (orderedIds: string[]) => Promise<void> | void;
   onCancel: () => void;
+  /**
+   * Franja de pánico, dibujada como primera fila DENTRO del bloque pegajoso.
+   * Va acá y no por fuera para que haya un solo elemento pegado arriba: dos
+   * `sticky top-0` apilados se tapan entre sí.
+   */
+  transport?: React.ReactNode;
   t: Strings;
 }
 
@@ -101,7 +107,7 @@ const ArrangerItem: React.FC<{
   );
 };
 
-export const PadArranger: React.FC<PadArrangerProps> = ({ pads, onSave, onCancel, t }) => {
+export const PadArranger: React.FC<PadArrangerProps> = ({ pads, onSave, onCancel, transport, t }) => {
   const [ids, setIds] = useState<string[]>(() => pads.map(p => p.id));
   const [saving, setSaving] = useState(false);
   const [confirmarDescarte, setConfirmarDescarte] = useState(false);
@@ -153,7 +159,9 @@ export const PadArranger: React.FC<PadArrangerProps> = ({ pads, onSave, onCancel
     <div className="space-y-3">
       {/* Pegajosa: en una lista larga —o en apaisado— "Listo" se iba de pantalla
           y había que subir todo para guardar. */}
-      <div className="sticky top-0 z-10 flex items-center gap-3 p-2 rounded-xl bg-blue-50 dark:bg-blue-950/95 border border-blue-200 dark:border-blue-900 backdrop-blur">
+      <div className="sticky top-0 z-10 space-y-2">
+      {transport}
+      <div className="flex items-center gap-3 p-2 rounded-xl bg-blue-50 dark:bg-blue-950/95 border border-blue-200 dark:border-blue-900 backdrop-blur">
         <p className="flex-1 min-w-0 text-[11px] text-blue-700 dark:text-blue-300 leading-relaxed">
           {confirmarDescarte ? t.soundpadArrangeDiscard : t.soundpadArrangeHint}
         </p>
@@ -173,6 +181,7 @@ export const PadArranger: React.FC<PadArrangerProps> = ({ pads, onSave, onCancel
           <Check size={13} />
           {confirmarDescarte ? t.cancel : t.soundpadArrangeDone}
         </button>
+      </div>
       </div>
 
       <Reorder.Group axis="y" values={ids} onReorder={setIds} className="space-y-1.5">

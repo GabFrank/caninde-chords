@@ -25,9 +25,14 @@ interface SoundPadEditorProps {
   onCreate: (file: File, draft: Partial<PadDraft>) => Promise<void>;
   onUpdate: (pad: SoundPad, changes: Partial<PadDraft>, file?: File) => Promise<void>;
   onDelete: (pad: SoundPad) => Promise<void>;
-  /** Prueba el sonido con los ajustes que se están editando, sin guardar. */
-  onPreview: (pad: SoundPad) => void;
+  /**
+   * Prueba el sonido con los ajustes que se están editando, sin guardar.
+   * Devuelve el id de la voz para poder apagar EXACTAMENTE esa al cerrar.
+   */
+  onPreview: (pad: SoundPad) => Promise<string | null>;
   onStopPreview: (pad: SoundPad) => void;
+  /** Apaga una voz puntual: la que arrancó la prueba de este editor. */
+  onStopVoice: (voiceId: string) => void;
   previewing: boolean;
   t: Strings;
   lang: 'es' | 'en';
@@ -50,7 +55,7 @@ const emptyDraft = {
 
 export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
   open, pad, categories, missing, onClose, onCreate, onUpdate, onDelete,
-  onPreview, onStopPreview, previewing, t, lang,
+  onPreview, onStopPreview, onStopVoice, previewing, t, lang,
 }) => {
   const [draft, setDraft] = useState({ ...emptyDraft });
   const [file, setFile] = useState<File | null>(null);
@@ -60,6 +65,28 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
   const [learning, setLearning] = useState(false);
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  /**
+   * Las voces que arrancó el botón "Probar" de ESTE editor.
+   *
+   * Cerrar el editor las apaga; cerrarlo NO apaga lo que ya estaba sonando
+   * cuando se abrió. La distinción importa en los dos sentidos: el operador que
+   * probó un ambiente y cerró se quedaba con un bucle suelto —y en la pantalla
+   * de preparación no hay nada que lo muestre—, pero el que disparó un pad a
+   * propósito y abrió el editor para mirar algo no quiere que cerrarlo le calle
+   * la ceremonia. Por eso se guardan ids de voz y no se llama a `stopPad`.
+   */
+  const vocesDePrueba = useRef<Set<string>>(new Set());
+
+  const probar = async (p: SoundPad) => {
+    const voiceId = await onPreview(p);
+    if (voiceId) vocesDePrueba.current.add(voiceId);
+  };
+
+  const cerrar = () => {
+    for (const voiceId of vocesDePrueba.current) onStopVoice(voiceId);
+    vocesDePrueba.current.clear();
+    onClose();
+  };
 
   useEffect(() => {
     // Al cerrar también: si no, "Aprender" quedaba escuchando y la próxima nota
@@ -124,7 +151,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
     try {
       if (pad) await onUpdate(pad, draft, file ?? undefined);
       else await onCreate(file!, draft);
-      onClose();
+      cerrar();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -137,7 +164,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
   const previewPad = pad ? { ...pad, ...draft } as SoundPad : null;
 
   return (
-    <Modal isOpen={open} onClose={onClose} title={pad ? t.soundpadEdit : t.soundpadAdd}>
+    <Modal isOpen={open} onClose={cerrar} title={pad ? t.soundpadEdit : t.soundpadAdd}>
       <form onSubmit={submit} className="space-y-5">
 
         {/* Archivo */}
@@ -329,7 +356,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
               trimStartMs={draft.trimStartMs}
               trimEndMs={draft.trimEndMs}
               onChange={(trim) => setDraft(d => ({ ...d, ...trim }))}
-              onPreview={() => previewPad && onPreview(previewPad)}
+              onPreview={() => { if (previewPad) void probar(previewPad); }}
               onStopPreview={() => previewPad && onStopPreview(previewPad)}
               previewing={previewing}
               t={t}
@@ -378,7 +405,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
           {previewPad && !missing && (
             <button
               type="button"
-              onClick={() => (previewing ? onStopPreview(previewPad) : onPreview(previewPad))}
+              onClick={() => (previewing ? onStopPreview(previewPad) : void probar(previewPad))}
               className="min-h-11 px-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-xs font-bold flex items-center gap-2"
             >
               {previewing ? <Square size={14} /> : <Play size={14} />}
@@ -401,7 +428,7 @@ export const SoundPadEditor: React.FC<SoundPadEditorProps> = ({
                 <p className="text-xs text-zinc-600 dark:text-zinc-400 flex-1">{t.soundpadDeletePad}</p>
                 <button
                   type="button"
-                  onClick={async () => { await onDelete(pad); onClose(); }}
+                  onClick={async () => { await onDelete(pad); cerrar(); }}
                   className="min-h-11 px-4 rounded-xl bg-red-600 text-white text-xs font-black"
                 >
                   {t.delete}
