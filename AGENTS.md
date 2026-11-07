@@ -74,6 +74,12 @@ con Google, en **[AUTH.md](AUTH.md)**.
 
 ### 1. Firebase & Error Handling
 - **Firestore:** Usar siempre `handleFirestoreError(error, OperationType, path)` para lanzar errores. Esto permite al sistema diagnosticar fallos de reglas de seguridad.
+- **NUNCA esperes a secas una escritura de Firestore.** La promesa de `addDoc`,
+  `updateDoc` y `setDoc` no resuelve al escribir: resuelve cuando el servidor
+  acusa. Sin red no resuelve nunca, y esperarla trababa la app detrás de un velo
+  a pantalla completa. Usá `esperarEscritura` de `src/lib/escrituraOffline.ts`,
+  que espera con un plazo y distingue confirmado / pendiente / fallo. Ver
+  [docs/OFFLINE.md](docs/OFFLINE.md).
 - **Identidad:** Siempre usar `user.uid` para filtrar y asignar `ownerId`.
 - **OriginalId:** Al aceptar un share o importar, guardar siempre el ID original en el campo `originalId` para mantener la trazabilidad.
 
@@ -118,6 +124,9 @@ con Google, en **[AUTH.md](AUTH.md)**.
   navegador real, con la red caída a propósito: disparo, overlay vs exclusivo,
   pánico, persistencia en IndexedDB e ida y vuelta del pack `.zip`. Detalle en
   [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
+- `npm run build && npm run offline` — la app entera con la red caída: que
+  guardar una canción o un setlist no trabe nada y sobreviva a recargar. Detalle
+  en [docs/OFFLINE.md](docs/OFFLINE.md).
 - `npm run build && npm run midiout` — pedal de efectos fingido en un navegador
   real: bytes del Program Change, corrimiento del canal, y los guardias de
   repetición y de "sin preset". Detalle en [docs/MIDI-PEDAL.md](docs/MIDI-PEDAL.md).

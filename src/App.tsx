@@ -19,6 +19,7 @@ import { UtilitariosHub } from './components/UtilitariosHub';
 import { midiService, isMidiSupported } from './services/midi';
 import { readPrefs } from './lib/midiOutputPrefs';
 import { shouldSendProgram, parseProgramInput, MIN_PROGRAM, MAX_PROGRAM } from './lib/midiProgram';
+import { esperarEscritura, EstadoEscritura } from './lib/escrituraOffline';
 import { Modal } from './components/Modal';
 import { AuthDiagnostics } from './components/AuthDiagnostics';
 import { describeAuthError, preferredLang } from './lib/authErrors';
@@ -550,6 +551,31 @@ export default function App() {
     return () => { cancelado = true; };
   }, []);
 
+  /**
+   * Guarda y avisa, sin colgarse cuando no hay red.
+   *
+   * Con la red caída, la promesa de Firestore nunca resuelve —espera el acuse
+   * del servidor, no la escritura—, así que esperarla a secas dejaba la app
+   * trabada detrás del velo de "SAVING…" para siempre. La escritura SÍ se
+   * aplicó localmente, de modo que lo correcto es seguir y decirlo.
+   */
+  const guardar = async (
+    promesa: Promise<unknown>,
+    ruta: string,
+    sufijo = '',
+    avisar = true,
+  ): Promise<EstadoEscritura> => {
+    const estado = await esperarEscritura(promesa, (e) => {
+      // `handleFirestoreError` lanza a propósito; acá el error ya se mostró.
+      try { handleFirestoreError(e, OperationType.WRITE, ruta); }
+      catch (err) { showToast(err instanceof Error ? err.message : String(err), 'error'); }
+    });
+    if (!avisar) return estado;
+    if (estado === 'confirmado') showToast(t.successUpdate + sufijo);
+    else if (estado === 'pendiente') showToast(t.savedOffline + sufijo);
+    return estado;
+  };
+
   const ultimoProgramaEnviado = useRef<number | null>(null);
   useEffect(() => {
     const prefs = readPrefs();
@@ -928,14 +954,15 @@ export default function App() {
     const settingRef = doc(db, 'userSongSettings', settingId);
 
     try {
-      await setDoc(settingRef, {
+      // Sin red esto tampoco resolvía nunca, así que quien guardaba sus ajustes
+      // de una canción no veía NINGÚN aviso —ni de éxito ni de error— y quedaba
+      // sin saber si se habían guardado. Se habían.
+      return await guardar(setDoc(settingRef, {
         ...settings,
         userId: user.uid,
         songId,
         updatedAt: serverTimestamp()
-      }, { merge: true });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `userSongSettings/${settingId}`);
+      }, { merge: true }), `userSongSettings/${settingId}`, '', false);
     } finally {
       setIsUpdatingSettings(false);
     }
@@ -948,14 +975,16 @@ export default function App() {
       // size and columns are fixed for the next session.
       setAutoResize(false);
       
-      await handleSettingsChange(songId, {
+      const estado = await handleSettingsChange(songId, {
         fontSize,
         columns,
         transpose,
         autoResize: false // Explicitly save as false
       });
       setHasPendingSongChanges(false);
-      showToast(t.successUpdate);
+      if (estado !== 'fallo') {
+        showToast(estado === 'pendiente' ? t.savedOffline : t.successUpdate);
+      }
     }
   };
 
@@ -1085,6 +1114,7 @@ export default function App() {
   const saveSong = async (songData: Partial<Song>) => {
     if (!user) return;
     setGlobalLoading(t.saving || 'Saving...');
+    let estado: EstadoEscritura = 'confirmado';
     try {
       if (selectedSong?.id) {
         const isOwner = selectedSong.ownerId === user.uid;
@@ -1092,15 +1122,14 @@ export default function App() {
 
         if (isOwner || isEditor) {
           // Direct edit for owners and editors
-          await updateDoc(doc(db, 'songs', selectedSong.id), {
+          estado = await guardar(updateDoc(doc(db, 'songs', selectedSong.id), {
             ...songData,
             updatedAt: serverTimestamp(),
-          });
-          showToast(t.successUpdate);
+          }), 'songs');
         } else {
           // Branching on Edit (Option 3): Create a personal copy
           const { id, createdAt, updatedAt, ownerId, collaborators, editors, ...originalData } = selectedSong;
-          await addDoc(collection(db, 'songs'), {
+          estado = await guardar(addDoc(collection(db, 'songs'), {
             ...originalData,
             ...songData,
             ownerId: user.uid,
@@ -1109,8 +1138,7 @@ export default function App() {
             originalId: id,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-          });
-          showToast(t.successUpdate + " (Personal copy)");
+          }), 'songs', " (Personal copy)");
         }
       } else {
         const isDuplicate = songs.some(s => 
@@ -1124,18 +1152,22 @@ export default function App() {
           return;
         }
 
-        await addDoc(collection(db, 'songs'), {
+        estado = await guardar(addDoc(collection(db, 'songs'), {
           ...songData,
           ownerId: user.uid,
           collaborators: [],
           editors: [],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        });
-        showToast(t.successUpdate);
+        }), 'songs');
       }
-      setIsEditing(false);
-      setSelectedSong(null);
+      // Sólo se cierra el editor si la escritura NO fue rechazada. Con
+      // 'pendiente' sí se cierra: la canción ya está en la caché local y en la
+      // lista, y el servidor la recibirá cuando vuelva la conexión.
+      if (estado !== 'fallo') {
+        setIsEditing(false);
+        setSelectedSong(null);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'songs');
     } finally {
@@ -1146,6 +1178,7 @@ export default function App() {
   const saveSetlist = async (setlistData: Partial<Setlist>) => {
     if (!user) return;
     setGlobalLoading(t.saving || 'Saving...');
+    let estado: EstadoEscritura = 'confirmado';
     try {
       if (selectedSetlist?.id) {
         const isOwner = selectedSetlist.ownerId === user.uid;
@@ -1183,14 +1216,15 @@ export default function App() {
               }
             }
           }
-          if (needsBatch) await batch.commit();
+          // El lote tampoco se espera a secas: sin red dejaba el guardado del
+          // setlist colgado antes siquiera de intentarlo.
+          if (needsBatch) await guardar(batch.commit(), 'songs', '', false);
         }
 
-        await updateDoc(doc(db, 'setlists', selectedSetlist.id), {
+        estado = await guardar(updateDoc(doc(db, 'setlists', selectedSetlist.id), {
           ...setlistData,
           updatedAt: serverTimestamp(),
-        });
-        showToast(t.successUpdate);
+        }), 'setlists');
       } else {
         const isDuplicate = setlists.some(s => 
           s.name.toLowerCase().trim() === (setlistData.name || '').toLowerCase().trim() &&
@@ -1202,18 +1236,19 @@ export default function App() {
           return;
         }
 
-        await addDoc(collection(db, 'setlists'), {
+        estado = await guardar(addDoc(collection(db, 'setlists'), {
           ...setlistData,
           ownerId: user.uid,
           collaborators: [],
           editors: [],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        });
-        showToast(t.successUpdate);
+        }), 'setlists');
       }
-      setIsEditing(false);
-      setSelectedSetlist(null);
+      if (estado !== 'fallo') {
+        setIsEditing(false);
+        setSelectedSetlist(null);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'setlists');
     } finally {

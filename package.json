@@ -12,7 +12,8 @@
     "test": "vitest run",
     "smoke": "node e2e/smoke.mjs",
     "soundpad": "node e2e/soundpad.mjs",
-    "midiout": "node e2e/midiout.mjs"
+    "midiout": "node e2e/midiout.mjs",
+    "offline": "node e2e/offline.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
