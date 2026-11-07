@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, arrayUnion, arrayRemove, or, getDoc, setDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, arrayUnion, arrayRemove, or, getDoc, setDoc, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from './firebase';
 import { useAuth } from './components/AuthProvider';
@@ -10,12 +10,15 @@ import { SongEditor } from './components/SongEditor';
 import { SetlistViewer } from './components/SetlistViewer';
 import { SetlistEditor } from './components/SetlistEditor';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { Music, Plus, LogIn, LogOut, Settings, Settings2, List, Search, ChevronRight, ChevronLeft, ChevronDown, Share2, Trash2, Edit2, UserPlus, Sun, Moon, Maximize2, Minimize2, Columns, Users, X, XCircle, Radio, Copy, Check, Maximize, Hash, WifiOff, Upload, RefreshCw, Save, Mail, AlertCircle, Compass } from 'lucide-react';
+import { Cable, Music, Plus, LogIn, LogOut, Settings, Settings2, List, Search, ChevronRight, ChevronLeft, ChevronDown, Share2, Trash2, Edit2, UserPlus, Sun, Moon, Maximize2, Minimize2, Columns, Users, X, XCircle, Radio, Copy, Check, Maximize, Hash, WifiOff, Upload, RefreshCw, Save, Mail, AlertCircle, Compass } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getLogoUrl, isStandalonePWA } from './lib/utils';
 import { useViewport } from './lib/useViewport';
 import { importOpenSongFile } from './lib/openSongParser';
 import { UtilitariosHub } from './components/UtilitariosHub';
+import { midiService, isMidiSupported } from './services/midi';
+import { readPrefs } from './lib/midiOutputPrefs';
+import { shouldSendProgram, parseProgramInput, MIN_PROGRAM, MAX_PROGRAM } from './lib/midiProgram';
 import { Modal } from './components/Modal';
 import { AuthDiagnostics } from './components/AuthDiagnostics';
 import { describeAuthError, preferredLang } from './lib/authErrors';
@@ -498,6 +501,98 @@ export default function App() {
       }
     }
   }, [selectedSong?.id, selectedSetlist?.id, currentSetlistIndex, userSongSettings, profile]);
+
+  /**
+   * Le manda el preset al pedal de efectos cuando cambia la canción en pantalla.
+   *
+   * Se dispara con la canción que se está TOCANDO: la abierta en el visor, o la
+   * del setlist —que en Modo Director la mueve el director, así que el pedal del
+   * espectador se arma solo—. No se dispara mientras se edita: estar escribiendo
+   * la letra de un tema no es tocarlo.
+   *
+   * El número vive en `userSongSettings`, no en la canción: es el preset de TU
+   * equipo, y compartir la canción no tiene por qué imponerle tu numeración a
+   * nadie.
+   */
+  /** La canción que se está tocando: la abierta, o la del setlist. */
+  const songEnPantallaId = selectedSong?.id
+    ?? (selectedSetlist ? selectedSetlist.songIds[currentSetlistIndex] : null);
+  const presetDeLaCancion = songEnPantallaId
+    ? userSongSettings[songEnPantallaId]?.midiProgram
+    : undefined;
+  /**
+   * Si el envío automático está encendido en ESTE equipo. Se lee una vez por
+   * render y no en cada pulsación: sin pedal configurado, el campo de preset no
+   * se muestra y no estorba a quien no usa nada de esto.
+   */
+  const midiAutoSend = readPrefs().autoSend;
+
+  /**
+   * Recupera el acceso MIDI al arrancar, si el usuario ya eligió un pedal.
+   *
+   * El servicio es un singleton de módulo: después de recargar la página —o de
+   * que el sistema operativo descarte la PWA y la vuelva a abrir— nadie había
+   * vuelto a pedir el acceso, así que el envío automático quedaba apagado EN
+   * SILENCIO y el pedal dejaba de seguir a las canciones sin ningún aviso. En
+   * una ceremonia eso se ve como "la app se rompió".
+   *
+   * Pedirlo de nuevo no muestra ningún diálogo: el navegador recuerda el
+   * permiso para este origen, y acá sólo se pide cuando el usuario ya lo
+   * concedió antes y dejó un pedal elegido.
+   */
+  useEffect(() => {
+    const prefs = readPrefs();
+    if (!prefs.autoSend || !isMidiSupported()) return;
+    let cancelado = false;
+    midiService.enable().then(ok => {
+      if (ok && !cancelado) midiService.selectOutput(prefs.outputId);
+    });
+    return () => { cancelado = true; };
+  }, []);
+
+  const ultimoProgramaEnviado = useRef<number | null>(null);
+  useEffect(() => {
+    const prefs = readPrefs();
+    if (!prefs.autoSend || isEditing) return;
+
+    const songId = selectedSong?.id
+      ?? (selectedSetlist ? selectedSetlist.songIds[currentSetlistIndex] : null);
+    if (!songId) return;
+
+    const programa = userSongSettings[songId]?.midiProgram;
+    if (!shouldSendProgram(ultimoProgramaEnviado.current, programa)) return;
+
+    midiService.selectOutput(prefs.outputId);
+    const r = midiService.sendProgramChange(programa as number, prefs.channel);
+    if (r.ok) {
+      ultimoProgramaEnviado.current = programa as number;
+    } else {
+      // Que el pedal no responda no puede frenar la función: se avisa y se
+      // sigue. Y no se recuerda como enviado, para que reintente al volver.
+      console.warn('No se pudo mandar el preset al pedal', r);
+    }
+  }, [selectedSong?.id, selectedSetlist?.id, currentSetlistIndex, userSongSettings, isEditing]);
+
+  /** Guarda el preset de la canción en pantalla. Vacío = no tocar el pedal. */
+  const cambiarPresetDeCancion = async (texto: string) => {
+    const songId = selectedSong?.id
+      ?? (selectedSetlist ? selectedSetlist.songIds[currentSetlistIndex] : null);
+    if (!songId) return;
+    const programa = parseProgramInput(texto);
+    if (programa === undefined) return;   // no es un número usable: no se guarda
+    // Vaciar el campo tiene que BORRAR la clave, no escribir `undefined`:
+    // Firestore rechaza `undefined` lanzando de forma SÍNCRONA, así que un
+    // `await` no lo atrapa y el error se escapa del manejador. `deleteField()`
+    // es la forma correcta de quitar una clave en un `setDoc` con merge.
+    // Van también los otros ajustes: si la ficha todavía no existe, esto la
+    // CREA, y las reglas exigen que una ficha de ajustes traiga `fontSize`,
+    // `columns`, `transpose` y `autoResize`. Sin esto, poner el primer preset de
+    // una canción daba permission-denied.
+    await handleSettingsChange(songId, {
+      fontSize, columns, transpose, autoResize,
+      midiProgram: (programa === null ? deleteField() : programa) as number | undefined,
+    });
+  };
 
   const updateContact = async (email: string, name?: string) => {
     if (!user || email === user.email) return;
@@ -1996,6 +2091,30 @@ export default function App() {
                             setHasPendingSongChanges(true);
                           }} className="min-h-9 min-w-9 inline-flex items-center justify-center hover:bg-white dark:hover:bg-zinc-800 rounded shadow-sm t-ui-sm font-bold">+</button>
                         </div>
+
+                        {/* Preset del pedal de efectos. Va acá, con la
+                            transposición y el tamaño de letra, porque es lo
+                            mismo: un ajuste TUYO para ESTA canción. Vacío
+                            significa "no tocar el pedal", que no es lo mismo
+                            que el preset 0. */}
+                        {midiAutoSend && (
+                          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 rounded-lg px-1.5" title={t.songMidiProgram}>
+                            <Cable size={12} className="text-blue-600 shrink-0" />
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={MIN_PROGRAM}
+                              max={MAX_PROGRAM}
+                              aria-label={t.songMidiProgram}
+                              placeholder={t.songMidiProgramNone}
+                              data-song-midi
+                              defaultValue={presetDeLaCancion ?? ''}
+                              key={`preset-${songEnPantallaId ?? 'none'}`}
+                              onBlur={(e) => { void cambiarPresetDeCancion(e.target.value); }}
+                              className="w-14 min-h-9 bg-transparent outline-none text-[11px] font-mono text-center"
+                            />
+                          </div>
+                        )}
 
                         {/* Auto Resize Toggle */}
                         <button 

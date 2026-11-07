@@ -64,6 +64,13 @@ export interface UserSongSettings {
   columns?: number;
   transpose?: number;
   autoResize?: boolean;
+  /**
+   * Número de Program Change que esta canción le pide al pedal de efectos
+   * (0..127). Vive acá y no en `Song` porque el preset es del equipo del
+   * músico: compartir la canción no le impone tu numeración a nadie.
+   * Ausente = esta canción no toca el pedal.
+   */
+  midiProgram?: number;
   updatedAt: any;
 }
 
