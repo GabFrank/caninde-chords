@@ -1,3 +1,11 @@
+# [3.2.0](https://github.com/GabFrank/caninde-chords/compare/v3.1.1...v3.2.0) (2026-11-07)
+
+
+### Features
+
+* **midi:** cada canción arma el preset del pedal de efectos ([2f36e1d](https://github.com/GabFrank/caninde-chords/commit/2f36e1d8d2d88ce1c8aa1b856f542ffee2719722))
+* **midi:** cada canción arma el preset del pedal de efectos ([#6](https://github.com/GabFrank/caninde-chords/issues/6)) ([be04bc9](https://github.com/GabFrank/caninde-chords/commit/be04bc98a0810f1e8c70a73aa42506f9fe4d1e37))
+
 ## [3.1.1](https://github.com/GabFrank/caninde-chords/compare/v3.1.0...v3.1.1) (2026-11-07)
 
 
