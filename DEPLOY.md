@@ -37,7 +37,9 @@ Pasos del workflow, en orden:
 | Checkout | `fetch-depth: 0`, semantic-release necesita historial y tags |
 | Setup Node 22 | con caché de npm |
 | `npm ci` | |
-| `npm test` | vitest sobre la lógica pura (motor del soundpad, pack, viewport); es la única compuerta de calidad del workflow |
+| `npm test` | vitest sobre la lógica pura: motor del soundpad, pack, viewport, MIDI y escrituras offline |
+| Instalar Chromium | para la prueba de humo |
+| `npm run build && npm run smoke` | interfaz en cuatro viewports; junto con `npm test` son las dos compuertas de calidad del workflow |
 | `npx semantic-release` | versión, `CHANGELOG.md`, tag y release de GitHub |
 | `npm run build` | Vite; genera `dist/` y `version.json` |
 | Deploy a Hosting | `FirebaseExtended/action-hosting-deploy`, canal `live` |
@@ -149,7 +151,18 @@ npm run dev      # http://localhost:3000
 npm run lint     # tsc --noEmit
 npm test         # vitest
 npm run build    # genera /dist
+
+# Pruebas de navegador. El build NO es opcional: sirven dist/, y sin compilar
+# medirían el build anterior (hay una guarda que corta si quedó atrás).
+npm run build && npm run smoke     # interfaz en cuatro viewports
+npm run build && npm run soundpad  # el Soundpad, con la red caída
+npm run build && npm run offline   # guardar sin red no traba la app
+npm run build && npm run midiout   # pedal de efectos fingido
 ```
+
+> El workflow sólo corre `npm test` y `npm run smoke`. Las otras dos pruebas de
+> navegador se corren a mano antes de mergear: necesitan más tiempo del que
+> conviene gastar en cada push.
 
 `.env.local` está en `.gitignore`. Hoy la app no necesita ninguna variable de
 entorno para funcionar: la configuración de Firebase es pública y vive en

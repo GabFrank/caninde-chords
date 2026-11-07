@@ -15,11 +15,11 @@ Acordado con el usuario, en este orden:
   pánico táctil que ese corte había dejado afuera, más los pads en teléfono
   apaisado. Ver "Dos pantallas" y gotchas 17 y 18 de
   [docs/SOUNDPAD.md](docs/SOUNDPAD.md).
+- [x] **MIDI de salida para cambiar presets de un pedal.** Ver
+  [docs/MIDI-PEDAL.md](docs/MIDI-PEDAL.md).
 
 Más adelante, sin fecha:
 
-- [x] **MIDI de salida para cambiar presets de un pedal.** Ver
-  [docs/MIDI-PEDAL.md](docs/MIDI-PEDAL.md).
 - [ ] **Disparo remoto en Modo Director:** que el director dispare un pad y suene
   en los dispositivos conectados. La infraestructura de sesiones ya existe; falta
   resolver que los espectadores tengan los mismos audios (pack `.zip`) y la

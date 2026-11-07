@@ -51,6 +51,12 @@ con Google, en **[AUTH.md](AUTH.md)**.
   y la Web MIDI API no está. `isMidiSupported()` lo detecta y la interfaz lo
   dice; no prometas MIDI en esos aparatos.
 
+- **Antes de tocar este módulo, leé [docs/SOUNDPAD.md](docs/SOUNDPAD.md).** Están
+  ahí los dieciocho gotchas que costaron un fallo real cada uno: por qué toda clave
+  recién escrita va protegida de `pruneOrphans`, por qué `subscribe()` entrega el
+  estado actual, por qué las repeticiones son una sola fuente en bucle, por qué
+  el disparo táctil se retira, y por qué nada puede empujar la grilla.
+
 ### 5. Pedal de efectos por MIDI (salida)
 - **Concepto:** cada canción guarda un número de Program Change y abrirla deja
   el pedal armado con ese preset. Funciona también en Modo Director.
@@ -64,11 +70,6 @@ con Google, en **[AUTH.md](AUTH.md)**.
 - **Antes de tocarlo, leé [docs/MIDI-PEDAL.md](docs/MIDI-PEDAL.md):** el canal
   viaja corrido en uno, "sin preset" no es "preset 0", y el acceso MIDI hay que
   recuperarlo al arrancar o el envío queda apagado en silencio.
-- **Antes de tocar este módulo, leé [docs/SOUNDPAD.md](docs/SOUNDPAD.md).** Están
-  ahí los dieciocho gotchas que costaron un fallo real cada uno: por qué toda clave
-  recién escrita va protegida de `pruneOrphans`, por qué `subscribe()` entrega el
-  estado actual, por qué las repeticiones son una sola fuente en bucle, por qué
-  el disparo táctil se retira, y por qué nada puede empujar la grilla.
 
 ## 🛠 Reglas Técnicas Obligatorias
 
@@ -130,7 +131,7 @@ con Google, en **[AUTH.md](AUTH.md)**.
 - `npm run build && npm run midiout` — pedal de efectos fingido en un navegador
   real: bytes del Program Change, corrimiento del canal, y los guardias de
   repetición y de "sin preset". Detalle en [docs/MIDI-PEDAL.md](docs/MIDI-PEDAL.md).
-- **El `npm run build` de esas dos líneas no es adorno:** las pruebas de
+- **El `npm run build` de esas cuatro líneas no es adorno:** las pruebas de
   navegador sirven `dist/`. Sin compilar, miden el build anterior y dan verde
   sobre código que no está. `e2e/distFresco.mjs` corta la prueba si `dist/` quedó
   atrás.
