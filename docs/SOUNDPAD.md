@@ -93,6 +93,7 @@ cualquiera de las tres pantallas.
 | `src/components/SoundPad/useSoundpad.ts` | Estado: Firestore + IndexedDB + motor |
 | `src/components/SoundPad/SoundpadBoard.tsx` | El tablero: sólo disparar |
 | `src/components/SoundPad/SoundpadSetup.tsx` | La preparación: crear, editar, categorías, orden, pack, MIDI |
+| `src/components/SoundPad/PanicStrip.tsx` | La salida de emergencia de las pantallas que no son el tablero |
 | `src/components/SoundPad/SoundPadButton.tsx` | El pad |
 | `src/components/SoundPad/SoundPadEditor.tsx` | Alta y edición |
 | `src/components/SoundPad/CategoryManager.tsx` | ABM de categorías |
@@ -102,10 +103,27 @@ cualquiera de las tres pantallas.
 | `src/lib/padTrim.ts` | Resolución del recorte contra la duración real |
 | `src/lib/waveform.ts` | Picos de la forma de onda |
 | `src/components/SoundPad/TrimEditor.tsx` | El recortador visual |
-| `src/services/midi.ts` | Web MIDI: permiso, controladores y notas |
+| `src/services/midi.ts` | Web MIDI **de entrada**: permiso, controladores y notas recibidas |
+
+El cromo de la app alrededor del módulo también cuenta: `src/App.tsx` y
+`src/components/UtilitariosHub.tsx` se compactan con `isShort` para que en
+teléfono apaisado entre una fila de pads (gotcha 17).
 
 Las interfaces `SoundPad` y `SoundCategory` están en `src/types.ts`; las reglas
 de acceso, en `firestore.rules`.
+
+### MIDI: hoy sólo entrada, y no en iOS
+
+`src/services/midi.ts` usa `access.inputs`: la app **escucha** notas para
+disparar pads. No manda nada (`access.outputs` no se toca), así que hoy no puede
+cambiarle un preset a un pedal.
+
+Y la Web MIDI API no existe en iPhone ni iPad: todos los navegadores de iOS están
+obligados a usar WebKit, que no la implementa (bug 107250), así que instalar otro
+navegador ahí no cambia nada. Sí funciona en Chrome/Edge de escritorio, Firefox
+108+ y Chrome en Android (con adaptador USB-OTG, o con un controlador Bluetooth
+MIDI que el sistema operativo ya exponga). `isMidiSupported()` lo detecta y la
+preparación lo dice en vez de ofrecer un botón inútil.
 
 ---
 
